@@ -22,18 +22,24 @@ class Game:
 
     def wait_for(self, text, timeout=20):
         end = time.time() + timeout
+        raw = ""
         while time.time() < end:
             try:
                 chunk = self.proc.read(65536)
             except EOFError:
                 break
+            raw = (raw + chunk)[-3000:]
             self.seen += ANSI.sub("", chunk)
             if text in self.seen:
                 self.seen = ""
                 print(f"  saw {text!r}")
                 return
-        tail = self.seen[-1500:]
-        raise AssertionError(f"never saw {text!r}; last output:\n{tail}")
+            if not chunk:
+                time.sleep(0.05)
+        alive = self.proc.isalive()
+        status = None if alive else self.proc.exitstatus
+        raise AssertionError(f"never saw {text!r} (process alive: {alive}, exit status: {status});\n"
+                             f"text: {self.seen[-1500:]!r}\nraw: {raw[-1500:]!r}")
 
     def send(self, keys):
         self.proc.write(keys)
