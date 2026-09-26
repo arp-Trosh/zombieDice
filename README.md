@@ -23,7 +23,89 @@ python3 -m zombie [--name NAME] [--ascii]  # the game (needs an 80x24 terminal; 
 - **Multiplayer > Join Game**: enter the host's address and port.
 
 In game: `R` roll, `S` stop and eat your brains, `T`/`Tab` chat, `F` bot speed (single player),
-`Q` leave, arrow keys + Enter for the buttons. Mouse clicks work too.
+`P` play again (host, once the game is over), `Q` leave (press twice to confirm), arrow keys +
+Enter for the buttons. Mouse clicks work too.
+
+### How to play
+
+You're a zombie. On your turn you shake the cup and roll three dice, trying to eat as many brains
+as you can before the humans shoot you three times. Keep pushing your luck, or stop and bank what
+you have.
+
+1. **Roll** (`R`). Three dice are drawn at random from the cup and rolled. Each face is one of:
+   - **Brain**: you ate a brain. The die is set aside and counts toward this turn's total.
+   - **Shotgun**: you got shot. The die is set aside. Three shotguns in one turn and you're done.
+   - **Footsteps**: your victim ran. The die stays in your hand and is rolled again if you keep going.
+2. **Decide.** Roll again (`R`) or **stop** (`S`) and add this turn's brains to your score.
+   You must roll at least once before you can stop.
+3. **Rolling again** always rolls three dice: your footstep dice first, topped up with new dice
+   from the cup.
+4. **Bust.** Reach 3 shotguns and your turn ends immediately, scoring nothing for that turn.
+   Brains banked on earlier turns are safe.
+
+### The rules
+
+- **The cup** holds 13 dice, refilled and shuffled at the start of every turn:
+
+  | die | count | brains | footsteps | shotguns | feel |
+  |-----|:-----:|:------:|:---------:|:--------:|------|
+  | green  | 6 | 3 | 2 | 1 | safe |
+  | yellow | 4 | 2 | 2 | 2 | even |
+  | red    | 3 | 1 | 2 | 3 | dangerous |
+
+- **Running out of dice:** if the cup can't supply enough dice to make three, your brain dice go
+  back into the cup (you keep credit for those brains) and the draw continues from there.
+  Shotgun dice never go back.
+- **Winning:** the first player to reach **13 brains** starts the **final round**: every other player
+  gets one last turn. After that, the highest score wins; equal top scores
+  share the win.
+- Turn order follows the scoreboard, top to bottom.
+
+### The game screen
+
+```
++-----------+--------------------------------------------+ +-------------------+
+| Dice Kept |               ~ YOUR TURN ~                | |    Scoreboard     |
+|           |                                            | | > You (you)    4  |
+| Brains 2  |                                            | |   ####.........   |
+| Shots 1/3 |              3D dice tray                  | |   Rotbeard     9  |
+|           |        (the dice you just rolled)          | |   #########....   |
+|  [brain]  |                                            | |        ...        |
+|  [brain]  |                                            | |                   |
+|  [  X  ]  |                                            | | First to 13 brains|
+|  [feet ]  |                                            | | dice legend       |
++-----------+--------------------------------------------+ |                   |
+ Brains this turn: 2 BB   Shotguns: 1/3 X                  |                   |
+ Footsteps to reroll: F   Cup: 4 green  3 yellow  2 red    |                   |
+ [Roll Dice (R)] [Stop & Eat Brains (S)] [Leave (Q)]       |                   |
++----------------------------------------------------------+-------------------+
+| Chat                                                                         |
+| game log, rolls, busts, and players' messages                                |
+| Press T or Tab to talk                                                       |
++------------------------------------------------------------------------------+
+```
+
+- **Dice tray** (centre, top): the 3D dice tumble here when anyone rolls, landing face up on the
+  result. The banner across the top says whose turn it is, and flags the **FINAL ROUND**. When the
+  game ends, a **GAME OVER** box here names the winner.
+- **Dice Kept** (left): this turn's running tally, with a rocking token for every die set aside:
+  brains, shotguns (X), and footsteps waiting to be rerolled. `+N brains eaten earlier` counts
+  brains whose dice went back into an empty cup. It widens on terminals 120+ columns wide.
+- **Status lines** (below the tray): the same turn at a glance in text, coloured by die:
+  `B` brains, `X` shotguns, `F` footsteps to reroll, plus how many of each colour are still in
+  the cup. Use this to judge the risk of the next roll.
+- **Buttons** (under the status lines): Roll Dice, Stop & Eat Brains, Speed (single player: bots
+  play at x1 or x3), and Leave. After the game the host gets **Play Again**. Buttons grey out when
+  it's not your turn.
+- **Scoreboard** (right): every player in turn order with their score and a progress bar to 13.
+  `>` marks whose turn it is, `*` the winner(s); `(you)`, `bot` and `left` tag players. When there's
+  room, a legend at the bottom shows each die colour's faces.
+- **Chat** (bottom, full width): the game log (rolls, busts, banked brains, whose turn it is) mixed
+  with players' messages and the bots' trash talk. Press `T` or `Tab` to type, `Enter` to send,
+  `Esc` to cancel.
+
+The **lobby** (multiplayer, before the game) has the player list on the left with open seats,
+your LAN address across the top, tips and keys on the right, and the same chat box at the bottom.
 
 ### How it's built
 
