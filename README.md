@@ -12,7 +12,9 @@ pip install -r requirements.txt   # just numpy
 python3 -m zombie [--name NAME]   # the game (needs an 80x24 terminal; bigger looks better)
 ```
 
-On Windows, run it from Windows Terminal (`py -m zombie`); nothing beyond numpy is needed. The display
+**Windows, no Python needed:** download `ZombieDice-<version>-windows-x64.zip` from the
+[Releases page](https://github.com/arp-Trosh/zombieDice/releases), extract it, and double-click
+`ZombieDice.exe`. With Python installed you can also run it from source (`py -m zombie`). The display
 is detected automatically; these flags (on the game and both demos) override it:
 
 - `--glyphs quad|sextant|half|ascii`: how finely cells are divided. `quad` (the default) works with any
@@ -257,7 +259,7 @@ to 1; the highlight is always white, so lower `specular` for large flat faces th
 wash out.
 
 **`Screen` and `run()`.** `run(frame_fn, fps=30, glyphs=None, color=None, mouse=False,
-background=None)` takes over the terminal and restores it however the loop ends (Ctrl-C raises
+background=None, title=None)` takes over the terminal (naming its window `title`, if given) and restores it however the loop ends (Ctrl-C raises
 `KeyboardInterrupt`). `frame_fn(screen, dt, keys)` returns `False` to stop. `keys` holds ints (a
 character's code, or a `Key` such as `Key.UP`, `Key.ENTER`, `Key.ESC`) and, with `mouse=True`,
 `MouseEvent(x, y, button, pressed)` values. `screen.text()` draws in the terminal's own ANSI colours,
@@ -271,6 +273,16 @@ exactly; by default, edges blend toward black over the terminal's own background
 80x16 title logo 12-16 ms, from half blocks to sextants. Cost grows with the pixel count, so large
 views in `sextant` mode are the most expensive (about 37 ms for a 150x45 view). Lower
 `edge_samples` or use `quad` if frames drop.
+
+**Windows release.** `.github/workflows/windows-release.yml` builds the zip on a Windows runner
+whenever a `v*` tag is pushed, and publishes it as a GitHub release. The exe is `python.exe` from
+python.org's embeddable package, renamed, so the only executable is the one signed by the Python
+Software Foundation. SmartScreen and Defender have no unknown or packed program to flag, as they often
+do with PyInstaller bundles. `ZombieDice._pth` enables the site module, and a `.pth` file starts
+`zombiedice_launch.py`, which runs the game and exits. The workflow runs the unit tests on Windows,
+checks the exe's signature, runs a packaged self-test (`ZOMBIEDICE_SELFTEST=1`), and plays a game
+through ConPTY (the console layer Windows Terminal uses) before publishing. The files are in
+`packaging/windows/`.
 
 **Windows.** Needs Windows 10 or later (for VT sequences in the console) and only numpy. Windows
 Terminal is recommended; the classic console works too, but its default fonts may lack sextants.

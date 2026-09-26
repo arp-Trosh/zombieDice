@@ -20,7 +20,7 @@ def main():
     args = parser.parse_args()
     app = App(args.name[:MAX_NAME])
     try:
-        run(app.frame, args.fps, mouse=True, **display_options(args))
+        run(app.frame, args.fps, mouse=True, title="Zombie Dice", **display_options(args))
     except KeyboardInterrupt:
         pass
     finally:
