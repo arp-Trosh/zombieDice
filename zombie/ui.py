@@ -792,7 +792,7 @@ class GameView(SessionView):
         self.draw_chat(screen, chat_top, 0, chat_h, cols)
 
     def draw_kept(self, screen, top, left, height, width):
-        """The "Dice Kept" panel: this turn's shotguns (X), brains, and footsteps waiting to be rerolled (shoes)."""
+        """The "Dice Kept" panel: this turn's shotguns (X), brains, and footsteps waiting to be rerolled (feet)."""
         draw_box(screen, top, left, height, width, "Dice Kept", Color.GREEN)
         s = self.shown
         if s is None or s["phase"] == "over":

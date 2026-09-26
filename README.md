@@ -33,7 +33,7 @@ In game: `R` roll, `S` stop and eat your brains, `T`/`Tab` chat, `F` bot speed (
 | `zombie/bots.py`     | NPC names, trash talk, and the AI: Monte Carlo bust odds against a per-bot risk appetite that shrinks as brains pile up; in the final round it keeps rolling until it's ahead |
 | `zombie/session.py`  | `HostSession` runs the game (single player = host with no server); `ClientSession` mirrors a remote host. Both hand the UI the same state snapshots |
 | `zombie/net.py`      | TCP, newline-delimited JSON, background reader threads |
-| `zombie/graphics.py` | extruded voxel title logo, zombie dice meshes, the dice tray, and the Dice Kept tokens (brain, sneakers, X) |
+| `zombie/graphics.py` | extruded voxel title logo, zombie dice meshes, the dice tray, and the Dice Kept tokens (brain, footprint, X) |
 | `zombie/ui.py`       | menu, multiplayer setup, lobby and game screens |
 
 The host is authoritative: clients send `hello`, `chat` and `act` (`roll`/`stop`) messages; the host

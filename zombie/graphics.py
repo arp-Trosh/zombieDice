@@ -124,21 +124,93 @@ class TitleLogo:
         screen.draw_frame(fb, top, left)
 
 
+# ----- 2D symbol shapes, shared by the die faces and the Dice Kept tokens -------------
+
+# Footprint in the GNOME-logo style, x right and y up in about -1..1: heel, ball, then the four
+# toes from big to little. The whole print leans by FOOT_LEAN radians (negative: toes to the right).
+FOOT_PARTS = ((-0.06, -0.55, 0.3, 0.28), (0.04, -0.08, 0.42, 0.38),
+              (-0.3, 0.62, 0.18, 0.2), (0.14, 0.72, 0.14, 0.15), (0.5, 0.58, 0.12, 0.12), (0.76, 0.3, 0.1, 0.1))
+FOOT_LEAN = -0.3
+
+# Brain seen from its left side, front to the right: (cx, cy, rx, ry) ellipses.
+CEREBRUM = (0.05, 0.12, 0.85, 0.6)
+TEMPORAL_LOBE = (0.22, -0.22, 0.5, 0.3)
+CEREBELLUM = (-0.52, -0.43, 0.3, 0.2)
+# The folds, drawn the way a cartoon brain is: polylines for the lateral fissure, the central
+# sulcus running down to it, and a curl in each lobe.
+BRAIN_FOLDS = (
+    ((0.74, -0.04), (0.4, 0.02), (0.05, -0.02), (-0.28, 0.1)),               # lateral fissure
+    ((0.02, 0.72), (0.14, 0.52), (0.0, 0.34), (0.12, 0.16), (0.04, 0.0)),     # central sulcus
+    ((0.8, 0.42), (0.58, 0.54), (0.42, 0.34), (0.62, 0.2)),                 # frontal lobe
+    ((-0.3, 0.66), (-0.2, 0.44), (-0.44, 0.3), (-0.64, 0.4)),               # parietal lobe
+    ((0.6, -0.26), (0.34, -0.2), (0.12, -0.3)),                             # temporal lobe
+    ((-0.6, 0.12), (-0.42, -0.06)),                                         # occipital lobe
+)
+
+
+def _ellipse(x, y, part):
+    cx, cy, rx, ry = part
+    return ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 1
+
+
+def _rotate(x, y, angle):
+    c, s = np.cos(angle), np.sin(angle)
+    return c * x - s * y, s * x + c * y
+
+
+def _near_polyline(x, y, points, width):
+    """True within `width` of the polyline through `points`."""
+    near = np.zeros(np.broadcast(x, y).shape, bool)
+    for (ax, ay), (bx, by) in zip(points, points[1:]):
+        dx, dy = bx - ax, by - ay
+        t = np.clip(((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy), 0, 1)
+        near |= np.hypot(x - ax - t * dx, y - ay - t * dy) < width
+    return near
+
+
+def foot_shape(x, y):
+    """True inside the footprint."""
+    fx, fy = _rotate(x, y, -FOOT_LEAN)
+    inside = np.zeros(np.broadcast(x, y).shape, bool)
+    for part in FOOT_PARTS:
+        inside |= _ellipse(fx, fy, part)
+    return inside
+
+
+def brain_shape(x, y, bold=1.0):
+    """Side view of a brain, front to the right: (inside, grooves) masks.
+
+    The cerebrum gets a handful of bold fold strokes and the cerebellum fine stripes:
+    about as much as survives at a dozen pixels across. bold > 1 thickens the strokes.
+    """
+    cx, cy, rx, ry = CEREBRUM
+    r = np.hypot((x - cx) / rx, (y - cy) / ry)
+    theta = np.arctan2((y - cy) / ry, (x - cx) / rx)
+    lumpy = r < 1 + 0.05 * np.sin(11 * theta) * (y > cy - 0.2)     # bumps along the top of the outline
+    cerebrum = lumpy | _ellipse(x, y, TEMPORAL_LOBE)
+    cerebellum = _ellipse(x, y, CEREBELLUM) & ~cerebrum
+    folds = np.zeros_like(cerebrum)
+    for stroke in BRAIN_FOLDS:
+        folds |= _near_polyline(x, y, stroke, 0.05 * bold)
+    folds &= cerebrum
+    stripes = cerebellum & (np.abs((y * 9) % 1 - 0.5) < 0.18)
+    return cerebrum | cerebellum, folds | stripes
+
+
 # ----- zombie dice -----------------------------------------------------------------
 
-def symbol_texture(face, res=40, ink=0.05):
+def symbol_texture(face, res=48, ink=0.05):
+    """A die face: dark ink on the light face, drawn from the same shapes as the Dice Kept tokens."""
     tex, u, v = face_texture(res)
     if face == BRAIN:
-        blob = ((u - 0.5) / 0.36) ** 2 + ((v - 0.5) / 0.3) ** 2 < 1
-        folds = np.sin(u * 28 + 2.5 * np.sin(v * 18)) > 0.75
-        tex[blob] = ink
-        tex[blob & folds] = 0.45
+        inside, grooves = brain_shape((u - 0.5) * 2.3, (v - 0.46) * 2.3, bold=1.6)
+        tex[inside] = ink
+        tex[inside & grooves] = 0.5
     elif face == SHOTGUN:
         inside = (np.minimum(u, v) > 0.18) & (np.maximum(u, v) < 0.82)
         tex[inside & ((np.abs(u - v) < 0.1) | (np.abs(u + v - 1) < 0.1))] = ink
     elif face == FEET:
-        for cu, cv in ((0.34, 0.38), (0.66, 0.62)):
-            tex[((u - cu) / 0.11) ** 2 + ((v - cv) / 0.2) ** 2 < 1] = ink
+        tex[foot_shape((u - 0.58) * 2.4, (v - 0.5) * 2.4)] = ink
     return tex
 
 
@@ -215,7 +287,7 @@ class DiceTray:
             screen.text(top + y, left + int(p[0]) - len(label) // 2, label, obj.color, bold=True)
 
 
-# ----- kept-dice tokens: a brain, a pair of shoes, a big X ---------------------------
+# ----- kept-dice tokens: a brain, a footprint, a big X ---------------------------
 
 def merge_meshes(meshes):
     verts, faces, base = [], [], 0
@@ -256,31 +328,72 @@ def blob_mesh(radii, center=(0.0, 0.0, 0.0), rings=8, segments=12, bump=None):
     return Mesh(verts, np.array(faces, dtype=int))
 
 
-def brain_mesh():
-    """Two wrinkled hemispheres with a cerebellum tucked under the back."""
-    def folds(d):
-        x, y, z = d.T
-        wrinkles = 0.07 * np.sin(9 * z + 4 * np.sin(6 * y)) * np.sin(8 * y + 3 * np.cos(7 * z))
-        return 1 + wrinkles - 0.1 * (y < -0.4) * (y + 0.4) ** 2  # flatter underneath
-    halves = [blob_mesh((0.36, 0.5, 0.72), (side * 0.2, 0.08, 0.0), rings=10, segments=16, bump=folds)
-              for side in (-1, 1)]
-    cerebellum = blob_mesh((0.4, 0.18, 0.22), (0.0, -0.33, -0.42), rings=6, segments=10)
-    stem = blob_mesh((0.1, 0.22, 0.1), (0.0, -0.45, -0.18), rings=4, segments=6)
-    return merge_meshes(halves + [cerebellum, stem])
+def pillow_mesh(shape, res=48, span=1.1, thickness=0.22, rim=4):
+    """A 2D shape (x, y -> inside mask, over -span..span) puffed up into a closed cushion.
+
+    The front is flat in the middle and rounds off over the last `rim` grid steps to the
+    outline, like a sticker or an embossed badge; the back mirrors it. Texture
+    coordinates are the (x, y) position, so a texture of the same shape lines up.
+    """
+    c = np.linspace(-span, span, res + 1)
+    x, y = np.meshgrid(c, -c)  # row 0 is the top
+    inside = shape(x, y)
+    depth = inside.astype(float)  # grid steps to the outline, by repeated erosion
+    core = inside.copy()
+    for _ in range(rim):
+        core = core & np.roll(core, 1, 0) & np.roll(core, -1, 0) & np.roll(core, 1, 1) & np.roll(core, -1, 1)
+        depth += core
+    z = thickness * np.sqrt(np.clip((depth - 1) / rim, 0, 1))
+    n = (res + 1) ** 2
+    front = np.c_[x.ravel(), y.ravel(), z.ravel()]
+    back = front * [1, 1, -1]
+    idx = np.arange(n).reshape(res + 1, res + 1)
+    a, b, c_, d = idx[:-1, :-1], idx[:-1, 1:], idx[1:, :-1], idx[1:, 1:]  # top-left, top-right, bottom-left, bottom-right
+    solid = (inside[:-1, :-1] & inside[:-1, 1:] & inside[1:, :-1] & inside[1:, 1:]).ravel()
+    quads = np.stack([a.ravel(), b.ravel(), c_.ravel(), d.ravel()], axis=1)[solid]
+    tl, tr, bl, br = quads.T
+    faces_front = np.r_[np.c_[tl, bl, br], np.c_[tl, br, tr]]  # counter-clockwise seen from +Z
+    faces_back = np.c_[faces_front[:, 0], faces_front[:, 2], faces_front[:, 1]] + n
+    faces = np.r_[faces_front, faces_back]
+    used, faces = np.unique(faces, return_inverse=True)  # drop the grid points outside the shape
+    mesh = Mesh(np.r_[front, back][used], faces.reshape(-1, 3))
+    uv = (mesh.vertices[:, :2] / span + 1) / 2
+    mesh.uvs = uv[mesh.faces]
+    mesh.materials = np.zeros(len(mesh.faces), dtype=int)
+    return mesh
 
 
-def shoes_mesh():
-    """A pair of high-top sneakers side by side, toes pointing forward (+Z)."""
-    parts = []
-    for side, stagger in ((-1, 0.18), (1, -0.18)):
-        x = side * 0.2
-        parts += [
-            block_mesh((x, -0.42, stagger), (0.3, 0.1, 1.0)),                # sole
-            blob_mesh((0.14, 0.14, 0.32), (x, -0.33, stagger + 0.16)),       # rounded toe box
-            block_mesh((x, -0.08, stagger - 0.26), (0.28, 0.62, 0.42)),      # ankle
-            block_mesh((x, 0.25, stagger - 0.26), (0.32, 0.08, 0.46)),       # padded collar
-        ]
-    return merge_meshes(parts)
+def brain_mesh(bold=1.2):
+    """The side-view brain as a puffy badge, painted with bold folds.
+
+    A dozen pixels across is too few for sculpted folds, and a round 3D brain reads as a
+    blob from most angles; a flat, evenly lit face with dark painted grooves reads like an icon.
+    """
+    res, span = 64, 1.1
+    mesh = pillow_mesh(lambda x, y: brain_shape(x, y)[0], span=span)
+    c = ((np.arange(res) + 0.5) / res * 2 - 1) * span
+    x, y = np.meshgrid(c, -c)
+    inside, grooves = brain_shape(x, y, bold)
+    mesh.textures = [np.where(inside & grooves, 0.0, 1.0)]  # grooves as black ink: dim shades of a hue stay too colourful
+    return mesh
+
+
+def foot_mesh():
+    """A bare footprint in the GNOME-logo style, facing the camera (+Z): a bean-shaped sole with four toes.
+
+    It is nearly flat and evenly lit like a printed logo, with chunky toes and wide gaps so the toes
+    stay separate in a 12x6-cell panel slot, and leans like the logo does.
+    """
+    parts = [
+        blob_mesh((0.3, 0.28, 0.06), (-0.06, -0.55, 0.0), rings=8, segments=16),   # heel
+        blob_mesh((0.42, 0.38, 0.07), (0.04, -0.08, 0.0), rings=8, segments=16),   # ball of the foot
+    ]
+    toes = ((-0.3, 0.62, 0.18, 0.2), (0.14, 0.72, 0.14, 0.15), (0.5, 0.58, 0.12, 0.12), (0.76, 0.3, 0.1, 0.1))
+    for x, y, rx, ry in toes:  # big toe down to little toe, curving round the top of the sole
+        parts.append(blob_mesh((rx, ry, 0.06), (x, y, 0.0), rings=6, segments=12))
+    foot = merge_meshes(parts)
+    foot.vertices = foot.vertices @ quat_to_matrix(quat_axis_angle((0, 0, 1), -0.3)).T  # lean the toes right
+    return foot
 
 
 def cross_mesh():
@@ -289,7 +402,7 @@ def cross_mesh():
                          for a in (np.pi / 4, -np.pi / 4)])
 
 
-TOKEN_MESHES = {BRAIN: brain_mesh, FEET: shoes_mesh, SHOTGUN: cross_mesh}
+TOKEN_MESHES = {BRAIN: brain_mesh, FEET: foot_mesh, SHOTGUN: cross_mesh}
 _TOKENS = {}
 
 
@@ -305,18 +418,19 @@ def token_mesh(face):
 
 
 class KeptDice:
-    """This turn's dice, each shown as a spinning token for what it rolled: brain, shoes or X."""
+    """This turn's dice, each shown as a rocking token for what it rolled: brain, foot or X."""
 
     CELL_W, CELL_H = 12, 7
     LABEL = {BRAIN: "Brain", SHOTGUN: "Shotgun", FEET: "Ran"}
     SPIN = 0.9    # radians per second
     STEPS = 72    # cached frames per turn of the spin
-    TILT = {BRAIN: 0.3, FEET: 0.45, SHOTGUN: 0.0}  # lean the top toward the camera
+    TILT = {BRAIN: 0.0, FEET: 0.0, SHOTGUN: 0.0}  # lean the top toward the camera
 
     def __init__(self):
-        self.renderer = Renderer(1, 1)
+        self.renderer = Renderer(1, 1, fog=0.1)  # the tokens are small and mostly flat; fog would only muddy them
         self.camera = Camera(position=np.array([0.0, 0.0, 6.0]), fov=24.0)
-        self.light = Light(direction=np.array([0.3, -0.5, -1.0]), ambient=0.25, diffuse=0.75)
+        # Soft, mostly-frontal light: at this size, shading gradients would drown out the painted detail.
+        self.light = Light(direction=np.array([0.3, -0.5, -1.0]), ambient=0.5, diffuse=0.5, specular=0.2)
         self.token = Object3D(None)
         self.t = 0.0
         self._frames = {}  # (face, color, width, height, step) -> FrameBuffer
@@ -328,12 +442,8 @@ class KeptDice:
         return max(width // self.CELL_W, 1) * max(height // self.CELL_H, 0)
 
     def angle(self, face, t):
-        """Yaw at time t. The X rocks so it never turns edge-on; the shoes rock around a side view."""
-        if face == SHOTGUN:
-            return 0.6 * np.sin(t * self.SPIN * 1.5)
-        if face == FEET:
-            return np.pi / 2 - 0.6 + 0.5 * np.sin(t * self.SPIN * 1.5)
-        return t * self.SPIN
+        """Yaw at time t: the tokens are flat-faced, so they rock rather than spin and never turn edge-on."""
+        return 0.6 * np.sin(t * self.SPIN * 1.5)
 
     def frame(self, face, color, width, height, t):
         """Rendered token at time t, cached by spin step since the models are costly to rasterize."""
@@ -356,7 +466,7 @@ class KeptDice:
         if (cell_w, token_h) != (self.renderer.width, self.renderer.height):
             self.renderer.resize(cell_w, token_h)
             self._frames.clear()
-            # Fit a spinning token (about 1.9 units across) into the cell.
+            # Fit a rocking token (about 1.9 units across) into the cell.
             tan_half = np.tan(np.radians(self.camera.fov) / 2)
             aspect = cell_w * self.renderer.cell_aspect / token_h
             self.camera.position = np.array([0.0, 0.0, max(0.95 / tan_half, 0.95 / (tan_half * aspect))])
