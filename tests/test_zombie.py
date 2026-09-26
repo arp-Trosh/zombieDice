@@ -329,11 +329,13 @@ class GraphicsTests(unittest.TestCase):
         from zombie.graphics import KeptDice, token_mesh
 
         class Screen:
+            cell_pixels = (1, 2)
+
             def __init__(self):
                 self.frames, self.labels = [], []
 
             def draw_frame(self, fb, y, x):
-                self.frames.append(fb.shade.copy())
+                self.frames.append(fb.alpha.copy())
 
             def text(self, y, x, s, *args, **kwargs):
                 self.labels.append(s)
@@ -345,11 +347,11 @@ class GraphicsTests(unittest.TestCase):
         dice = [(GREEN, BRAIN), (RED, SHOTGUN), (YELLOW, FEET)]
         self.assertEqual(kept.render(screen, 0, 0, 24, 14, dice), 3)
         self.assertEqual(screen.labels, ["Brain", "Shotgun", "Ran"])
-        for shade in screen.frames:
-            self.assertGreater((shade >= 0).mean(), 0.25)  # the token covers a good part of its cell
+        for alpha in screen.frames:
+            self.assertGreater((alpha >= 0.25).mean(), 0.25)  # the token covers a good part of its cell
         kept.t = 5.0
         kept.render(screen, 0, 0, 24, 14, dice)  # cached frames must not be overwritten by later renders
-        self.assertTrue(all((a >= 0).any() for a in screen.frames))
+        self.assertTrue(all((a > 0).any() for a in screen.frames))
 
 
 import numpy as np  # noqa: E402

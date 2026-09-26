@@ -1,9 +1,8 @@
 """Zombie Dice in the terminal: python -m zombie [--name NAME]"""
 import argparse
-import curses
 import getpass
 
-from unicode3d.terminal import init_locale, run_loop
+from unicode3d.terminal import add_display_args, display_options, run
 
 from .session import MAX_NAME
 from .ui import App
@@ -17,18 +16,11 @@ def main():
         default_name = "Player"
     parser.add_argument("--name", default=default_name, help="your player name")
     parser.add_argument("--fps", type=int, default=30)
-    parser.add_argument("--ascii", action="store_true", help="draw with ASCII characters instead of Unicode blocks")
+    add_display_args(parser)
     args = parser.parse_args()
-    init_locale()
     app = App(args.name[:MAX_NAME])
-
-    def run(stdscr):
-        curses.mousemask(curses.BUTTON1_PRESSED | curses.BUTTON1_CLICKED)
-        curses.mouseinterval(0)
-        run_loop(stdscr, app.frame, args.fps, "ascii" if args.ascii else None)
-
     try:
-        curses.wrapper(run)
+        run(app.frame, args.fps, mouse=True, **display_options(args))
     except KeyboardInterrupt:
         pass
     finally:

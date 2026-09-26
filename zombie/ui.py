@@ -1,7 +1,6 @@
 """Screens: main menu, multiplayer setup, lobby and the game table."""
-import curses
-
-from unicode3d.terminal import Color
+from unicode3d.color import Color
+from unicode3d.keys import Key, MouseEvent
 
 from .graphics import DIE_COLOR, DiceTray, KeptDice
 from .net import DEFAULT_PORT, local_ip
@@ -9,8 +8,8 @@ from .rules import BRAIN, FACES, FEET, GREEN, MAX_SHOTGUNS, RED, SHOTGUN, WINNIN
 from .session import MAX_NAME, MAX_PLAYERS, ClientSession, host_session, single_player_session
 
 MIN_COLS, MIN_ROWS = 80, 24
-ENTER = (10, 13, curses.KEY_ENTER)
-BACKSPACE = (8, 127, curses.KEY_BACKSPACE)
+ENTER = (10, 13, Key.ENTER)
+BACKSPACE = (8, 127, Key.BACKSPACE)
 ESC, TAB = 27, 9
 NAME_COLORS = (Color.CYAN, Color.MAGENTA, Color.YELLOW, Color.GREEN, Color.BLUE, Color.RED)
 FACE_WORD = {BRAIN: "brain", SHOTGUN: "shotgun", FEET: "footsteps"}
@@ -50,8 +49,8 @@ class TextField:
 
 class Stepper:
     """A number picked with Left/Right (or -/+), drawn as "< n >"; clicks on the arrows work too."""
-    DEC = (curses.KEY_LEFT, ord("-"), ord("_"))
-    INC = (curses.KEY_RIGHT, ord("+"), ord("="))
+    DEC = (Key.LEFT, ord("-"), ord("_"))
+    INC = (Key.RIGHT, ord("+"), ord("="))
 
     def __init__(self, value, lo, hi):
         self.lo, self.hi = lo, hi
@@ -89,7 +88,7 @@ class Toggle:
         self.value = not self.value
 
     def handle(self, k):
-        if k in (curses.KEY_LEFT, curses.KEY_RIGHT, ord(" ")):
+        if k in (Key.LEFT, Key.RIGHT, ord(" ")):
             self.flip()
             return True
         return False
@@ -200,9 +199,9 @@ class MenuView(View):
         self.focus = 0
 
     def key(self, k):
-        if k in (curses.KEY_UP, ord("k")):
+        if k in (Key.UP, ord("k")):
             self.focus = (self.focus - 1) % len(self.ITEMS)
-        elif k in (curses.KEY_DOWN, ord("j"), TAB):
+        elif k in (Key.DOWN, ord("j"), TAB):
             self.focus = (self.focus + 1) % len(self.ITEMS)
         elif k in ENTER or k == ord(" "):
             self.choose(self.focus)
@@ -248,9 +247,9 @@ class SinglePlayerView(View):
 
     def key(self, k):
         label, item = self.items[self.focus]
-        if k in (curses.KEY_UP, ord("k")):
+        if k in (Key.UP, ord("k")):
             self.focus = (self.focus - 1) % len(self.items)
-        elif k in (curses.KEY_DOWN, ord("j"), TAB):
+        elif k in (Key.DOWN, ord("j"), TAB):
             self.focus = (self.focus + 1) % len(self.items)
         elif k in (ESC, ord("q")):
             self.back()
@@ -320,9 +319,9 @@ class MultiplayerView(View):
 
     def key(self, k):
         label, item = self.items[self.focus]
-        if k in (curses.KEY_UP,):
+        if k in (Key.UP,):
             self.focus = (self.focus - 1) % len(self.items)
-        elif k in (curses.KEY_DOWN, TAB):
+        elif k in (Key.DOWN, TAB):
             self.focus = (self.focus + 1) % len(self.items)
         elif k == ESC:
             self.back()
@@ -537,9 +536,9 @@ class LobbyView(SessionView):
         if self.chatting:
             return self.chat_key(k)
         buttons = self.buttons()
-        if k in (curses.KEY_LEFT,):
+        if k in (Key.LEFT,):
             self.focus = (self.focus - 1) % len(buttons)
-        elif k in (curses.KEY_RIGHT,):
+        elif k in (Key.RIGHT,):
             self.focus = (self.focus + 1) % len(buttons)
         elif k in ENTER or k == ord(" "):
             label, action, enabled = buttons[min(self.focus, len(buttons) - 1)]
@@ -746,9 +745,9 @@ class GameView(SessionView):
         buttons = self.buttons()
         if k != ord("q") and k != ESC and not (k in ENTER and buttons[self.focus % len(buttons)][1] == self.request_leave):
             self.confirm_leave = False
-        if k == curses.KEY_LEFT:
+        if k == Key.LEFT:
             self.focus = (self.focus - 1) % len(buttons)
-        elif k == curses.KEY_RIGHT:
+        elif k == Key.RIGHT:
             self.focus = (self.focus + 1) % len(buttons)
         elif k in ENTER or k == ord(" "):
             label, action, enabled = buttons[self.focus % len(buttons)]
@@ -946,13 +945,9 @@ class App:
     def translate_mouse(keys):
         out = []
         for k in keys:
-            if k == curses.KEY_MOUSE:
-                try:
-                    _, x, y, _, state = curses.getmouse()
-                except curses.error:
-                    continue
-                if state & (curses.BUTTON1_PRESSED | curses.BUTTON1_CLICKED):
-                    out.append(Click(y, x))
+            if isinstance(k, MouseEvent):
+                if k.button == MouseEvent.LEFT and k.pressed:
+                    out.append(Click(k.y, k.x))
             else:
                 out.append(k)
         return out

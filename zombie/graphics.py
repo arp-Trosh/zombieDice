@@ -4,7 +4,7 @@ import numpy as np
 from unicode3d.dice import RollAnimation, face_texture
 from unicode3d.mesh import Mesh, make_box
 from unicode3d.scene import Camera, Light, Object3D, Renderer
-from unicode3d.terminal import Color
+from unicode3d.color import Color
 from unicode3d.transforms import UP, normalize, quat_axis_angle, quat_mul, quat_to_matrix
 
 from .rules import BRAIN, FACES, FEET, GREEN, RED, SHOTGUN, YELLOW
@@ -87,7 +87,8 @@ class TitleLogo:
     def __init__(self):
         self.renderer = Renderer(1, 1)
         self.camera = Camera(target=np.zeros(3), fov=26.0, far=500.0)
-        self.light = Light(direction=np.array([0.3, -0.6, -1.0]), ambient=0.15, diffuse=0.85)
+        # A faint highlight: the big flat letter fronts would otherwise wash out to white.
+        self.light = Light(direction=np.array([0.3, -0.6, -1.0]), ambient=0.15, diffuse=0.85, specular=0.08)
         self.parts = []
         self.width = 0
         for text, color, y in self.LINES:
@@ -115,7 +116,7 @@ class TitleLogo:
     def render(self, screen, top, left, width, height):
         if width < 10 or height < 4:
             return
-        self.renderer.resize(width, height)
+        self.renderer.resize(width, height, screen.cell_pixels)
         tan_half = np.tan(np.radians(self.camera.fov) / 2)
         aspect = width * self.renderer.cell_aspect / height
         dist = max(11.0 / tan_half, (self.width / 2 + 4.0) / (tan_half * aspect))
@@ -269,7 +270,7 @@ class DiceTray:
     def render(self, screen, top, left, width, height):
         if width < 4 or height < 3:
             return
-        self.renderer.resize(width, height)
+        self.renderer.resize(width, height, screen.cell_pixels)
         tan_half = np.tan(np.radians(self.camera.fov) / 2)
         aspect = width * self.renderer.cell_aspect / height
         dist = max(1.6 / tan_half, 3.5 / (tan_half * aspect))
@@ -430,7 +431,7 @@ class KeptDice:
         self.renderer = Renderer(1, 1, fog=0.1)  # the tokens are small and mostly flat; fog would only muddy them
         self.camera = Camera(position=np.array([0.0, 0.0, 6.0]), fov=24.0)
         # Soft, mostly-frontal light: at this size, shading gradients would drown out the painted detail.
-        self.light = Light(direction=np.array([0.3, -0.5, -1.0]), ambient=0.5, diffuse=0.5, specular=0.2)
+        self.light = Light(direction=np.array([0.3, -0.5, -1.0]), ambient=0.5, diffuse=0.5, specular=0.1)
         self.token = Object3D(None)
         self.t = 0.0
         self._frames = {}  # (face, color, width, height, step) -> FrameBuffer
@@ -463,8 +464,8 @@ class KeptDice:
         cell_w = width // cols
         shown = dice[:self.capacity(width, height)]
         token_h = self.CELL_H - 1  # the last row of each cell is the label
-        if (cell_w, token_h) != (self.renderer.width, self.renderer.height):
-            self.renderer.resize(cell_w, token_h)
+        if (cell_w, token_h, screen.cell_pixels) != (self.renderer.width, self.renderer.height, self.renderer.cell_pixels):
+            self.renderer.resize(cell_w, token_h, screen.cell_pixels)
             self._frames.clear()
             # Fit a rocking token (about 1.9 units across) into the cell.
             tan_half = np.tan(np.radians(self.camera.fov) / 2)
