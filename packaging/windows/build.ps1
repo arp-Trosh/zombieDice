@@ -38,7 +38,8 @@ Remove-Item (Join-Path $app "pythonw.exe"), (Join-Path $app "python$tag._pth")
 Write-Host "== numpy"
 $site = Join-Path $app "Lib\site-packages"
 python -m pip install --disable-pip-version-check --no-compile --only-binary=:all: --target $site "numpy>=1.26"
-Get-ChildItem $site -Directory -Filter "*.dist-info" | Out-Null
+# pip adds command-line launchers (f2py.exe, numpy-config.exe) there: unsigned exes the game never uses.
+Remove-Item -Recurse -Force (Join-Path $site "bin") -ErrorAction SilentlyContinue
 
 Write-Host "== game"
 $code = Join-Path $app "app"
