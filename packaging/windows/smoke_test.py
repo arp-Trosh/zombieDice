@@ -1,6 +1,6 @@
 """Plays the built ZombieDice.exe in a real Windows console (ConPTY, as Windows Terminal uses).
 
-Starts a single-player game, rolls, leaves, and quits from the menu, checking the
+Starts a two-player single-player game, rolls, leaves, and quits from the menu, checking the
 screen at each step: this exercises the Windows console setup, VT input decoding
 and output that unit tests cannot. Usage: python smoke_test.py dist/ZombieDice/ZombieDice.exe
 """
@@ -16,7 +16,8 @@ ANSI = re.compile(r"\x1b(\[[0-9;?<>]*[ -/]*[@-~]|\][^\x07]*\x07|[@-Z\\-_])")
 
 class Game:
     def __init__(self, exe):
-        self.proc = PtyProcess.spawn(exe, dimensions=(34, 110))
+        env = dict(os.environ, ZOMBIEDICE_NAME="Smoke")  # also checks the launcher passes the name on
+        self.proc = PtyProcess.spawn(exe, env=env, dimensions=(34, 110))
         self.seen = ""
 
     def wait_for(self, text, timeout=20):
@@ -44,10 +45,12 @@ def main(exe):
     game.wait_for("Single Player")
     game.send("\r")                      # Single Player
     game.wait_for("SINGLE PLAYER")
-    game.send("\r")                      # start with the default number of players
-    game.wait_for("YOUR TURN")
+    game.send("----")                    # down to 2 players, so the one bot's turns are quick
+    game.wait_for("you + 1 bot")
+    game.send("\r")                      # Start Game
+    game.wait_for("YOUR TURN", timeout=120)  # turn order is random: the bot may go first
     game.send("r")
-    game.wait_for("rolled")
+    game.wait_for("Smoke rolled")
     game.send("q")
     game.send("q")                       # leave (confirmed), back to the menu
     game.wait_for("Multiplayer")
