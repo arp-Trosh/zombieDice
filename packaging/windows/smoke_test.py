@@ -11,35 +11,74 @@ import time
 
 from winpty import PtyProcess
 
-ANSI = re.compile(r"\x1b(\[[0-9;?<>]*[ -/]*[@-~]|\][^\x07]*\x07|[@-Z\\-_])")
+TOKEN = re.compile(r"\x1b\[([0-9;?<>]*)([ -/]*[@-~])|\x1b\][^\x07]*\x07|\x1b[@-Z\\-_]|[\r\n]|[^\x1b\r\n]+")
+ROWS, COLS = 34, 110
+
+
+class VirtualScreen:
+    """Just enough of a terminal to follow the game's output: the game only rewrites cells that
+    change, so text on screen is often never sent in one piece."""
+
+    def __init__(self):
+        self.cells = [[" "] * COLS for _ in range(ROWS)]
+        self.y = self.x = 0
+
+    def feed(self, data):
+        for m in TOKEN.finditer(data):
+            tok = m.group(0)
+            if m.group(2):
+                self._csi(m.group(1), m.group(2)[-1])
+            elif tok == "\r":
+                self.x = 0
+            elif tok == "\n":
+                self.y = min(self.y + 1, ROWS - 1)
+            elif not tok.startswith("\x1b"):
+                for ch in tok:
+                    if self.x < COLS:
+                        self.cells[self.y][self.x] = ch
+                    self.x += 1
+
+    def _csi(self, params, final):
+        nums = [int(p) if p.isdigit() else 0 for p in params.lstrip("?<>").split(";")]
+        if final in "Hf":
+            y, x = (nums + [1, 1])[:2]
+            self.y, self.x = min(max(y, 1), ROWS) - 1, min(max(x, 1), COLS) - 1
+        elif final == "J" and not params.startswith("?"):
+            self.cells = [[" "] * COLS for _ in range(ROWS)]
+        elif final == "K":
+            self.cells[self.y][self.x:] = [" "] * (COLS - self.x)
+        elif final == "C":
+            self.x += max(nums[0], 1)
+        elif final == "G":
+            self.x = max(nums[0], 1) - 1
+
+    def text(self):
+        return "\n".join("".join(row) for row in self.cells)
 
 
 class Game:
     def __init__(self, exe):
         env = dict(os.environ, ZOMBIEDICE_NAME="Smoke")  # also checks the launcher passes the name on
-        self.proc = PtyProcess.spawn(exe, env=env, dimensions=(34, 110))
-        self.seen = ""
+        self.proc = PtyProcess.spawn(exe, env=env, dimensions=(ROWS, COLS))
+        self.screen = VirtualScreen()
 
     def wait_for(self, text, timeout=20):
         end = time.time() + timeout
-        raw = ""
         while time.time() < end:
             try:
                 chunk = self.proc.read(65536)
             except EOFError:
                 break
-            raw = (raw + chunk)[-3000:]
-            self.seen += ANSI.sub("", chunk)
-            if text in self.seen:
-                self.seen = ""
+            self.screen.feed(chunk)
+            if text in self.screen.text():
                 print(f"  saw {text!r}")
                 return
             if not chunk:
                 time.sleep(0.05)
         alive = self.proc.isalive()
         status = None if alive else self.proc.exitstatus
-        raise AssertionError(f"never saw {text!r} (process alive: {alive}, exit status: {status});\n"
-                             f"text: {self.seen[-1500:]!r}\nraw: {raw[-1500:]!r}")
+        raise AssertionError(f"never saw {text!r} (process alive: {alive}, exit status: {status}); screen:\n"
+                             + self.screen.text())
 
     def send(self, keys):
         self.proc.write(keys)
