@@ -8,9 +8,11 @@ falls back to 256 or 16 colours and to ASCII on terminals that need it.
 ## Play
 
 ```sh
-pip install -r requirements.txt   # just numpy
+pip install -r requirements.txt   # just numpy (Python 3.10 or later)
 python3 -m zombie [--name NAME]   # the game (needs an 80x24 terminal; bigger looks better)
 ```
+
+Your player name defaults to your login name; `--name` (or the Multiplayer screen) changes it.
 
 **Windows, no Python needed:** download `ZombieDice-<version>-windows-x64.zip` from the
 [Releases page](https://github.com/arp-Trosh/zombieDice/releases), extract it, and double-click
@@ -24,6 +26,7 @@ is detected automatically; these flags (on the game and both demos) override it:
   question marks, use `--glyphs quad`.
 - `--color truecolor|256|16|mono`: colour depth.
 - `--ascii`: plain characters, for terminals without Unicode.
+- `--fps N`: the frame rate to aim for (default 30).
 
 The environment variables `UNICODE3D_GLYPHS` and `UNICODE3D_COLOR` set the same things. While
 playing, on any screen, `F2` cycles the glyphs (half, quad, sextant, ascii), `F3` the colours
@@ -33,8 +36,9 @@ frame rate as achieved/target (e.g. `41/60fps`); click a setting to change it.
 
 - **Single Player**: pick the number of players (2-8, default 6), then play against that many
   computer zombies minus you.
-- **Multiplayer > Host Game**: pick the number of players (2-8 seats) and a port (5555 by default).
-  Choose whether to allow **Bots**. The lobby shows your LAN address; the host can still change the
+- **Multiplayer** opens one form for both hosting and joining, where you can also change your name.
+- **Multiplayer > Host Game**: pick the number of players (2-8 seats, default 4) and a port (5555 by
+  default). Choose whether to allow **Bots**. The lobby shows your LAN address; the host can still change the
   seat count with `-`/`+` and flip bots on/off with `B`. With bots on, open seats are filled with bots
   at Start and a player who leaves mid-game is taken over by a bot; with bots off it's humans only
   (at least two needed) and a player who leaves has their turns skipped. Joins are refused once every
@@ -42,8 +46,8 @@ frame rate as achieved/target (e.g. `41/60fps`); click a setting to change it.
 - **Multiplayer > Join Game**: enter the host's address and port.
 
 In game: `R` roll, `S` stop and eat your brains, `T`/`Tab` chat, `F` bot speed (single player),
-`P` play again (host, once the game is over), `Q` leave (press twice to confirm), arrow keys +
-Enter for the buttons. Mouse clicks work too.
+`P` play again (host, once the game is over), `Q` leave (press twice to confirm), Left/Right arrows +
+Enter or Space for the buttons. Mouse clicks work too.
 
 ### How to play
 
@@ -102,6 +106,7 @@ you have.
 | game log, rolls, busts, and players' messages                                |
 | Press T or Tab to talk                                                       |
 +------------------------------------------------------------------------------+
+                                        F2 sextant  F3 truecolor  F4 30/30fps
 ```
 
 - **Dice tray** (centre, top): the 3D dice tumble here when anyone rolls, landing face up on the
@@ -115,13 +120,16 @@ you have.
   the cup. Use this to judge the risk of the next roll.
 - **Buttons** (under the status lines): Roll Dice, Stop & Eat Brains, Speed (single player: bots
   play at x1 or x3), and Leave. After the game the host gets **Play Again**. Buttons grey out when
-  it's not your turn.
+  it's not your turn. When the full labels don't fit, they shorten to the key and a word
+  (`R Roll`, `S Stop`, `F x1`, `Q Leave`).
 - **Scoreboard** (right): every player in turn order with their score and a progress bar to 13.
   `>` marks whose turn it is, `*` the winner(s); `(you)`, `bot` and `left` tag players. When there's
   room, a legend at the bottom shows each die colour's faces.
 - **Chat** (bottom, full width): the game log (rolls, busts, banked brains, whose turn it is) mixed
   with players' messages and the bots' trash talk. Press `T` or `Tab` to type, `Enter` to send,
   `Esc` to cancel.
+- **Display settings** (bottom row, on every screen): glyphs, colours and frame rate; see
+  [Play](#play).
 
 The **lobby** (multiplayer, before the game) has the player list on the left with open seats,
 your LAN address across the top, tips and keys on the right, and the same chat box at the bottom.
@@ -134,7 +142,7 @@ your LAN address across the top, tips and keys on the right, and the same chat b
 | `zombie/bots.py`     | NPC names, trash talk, and the AI: Monte Carlo bust odds against a per-bot risk appetite that shrinks as brains pile up; in the final round it keeps rolling until it's ahead |
 | `zombie/session.py`  | `HostSession` runs the game (single player = host with no server); `ClientSession` mirrors a remote host. Both hand the UI the same state snapshots |
 | `zombie/net.py`      | TCP, newline-delimited JSON, background reader threads |
-| `zombie/graphics.py` | extruded voxel title logo, zombie dice meshes, the dice tray, and the Dice Kept tokens (brain, footprint, X) |
+| `zombie/graphics.py` | the voxel title logo (its font and animation), zombie dice meshes, the dice tray, and the Dice Kept tokens (brain, footprint, X) |
 | `zombie/ui.py`       | menu, multiplayer setup, lobby and game screens |
 
 The host is authoritative: clients send `hello`, `chat` and `act` (`roll`/`stop`) messages; the host
@@ -144,12 +152,14 @@ broadcasts `state` snapshots and `chat` lines. A player who disconnects mid-game
 ## Renderer demos
 
 ```sh
-python3 -m unicode3d                      # dice roll demo: space rolls, +/- dice count, q quits
-python3 -m unicode3d.viewer [model.obj]   # spinning model viewer (WASD/arrows, q/e spin, Esc)
-python3 -m unittest                       # tests
+python3 -m unicode3d [-n DICE] [--seed N]                # dice roll demo: space rolls, +/- dice count, q quits
+python3 -m unicode3d.examples.viewer [model.obj]         # spinning model viewer (WASD/arrows, q/e spin, Esc)
+python3 -m unittest                                      # tests: engine (test_renderer) and game (test_zombie)
 ```
 
-All three take the display flags above. A small font and a large terminal give the best detail.
+Both demos take the display flags above, `--fps` included; the viewer shows a die when given no
+model, and `--double-sided` draws back faces for meshes with inconsistent winding. A small font and
+a large terminal give the best detail.
 
 ### How it draws
 
@@ -182,8 +192,10 @@ All three take the display flags above. A small font and a large terminal give t
 
 ## unicode3d layout
 
-`unicode3d` is self-contained, with nothing specific to this game, and is meant to become its own
-project that other terminal games use.
+`unicode3d` is self-contained, with nothing specific to this game (it never imports `zombie`), and
+is meant to become its own project that other terminal games use. Its tests, in
+`tests/test_renderer.py`, use only its public API. The `examples/` programs show the engine in use;
+games may build on them, as zombieDice does with `examples/dice.py`.
 
 | module          | role |
 |-----------------|------|
@@ -195,9 +207,12 @@ project that other terminal games use.
 | `color.py`      | sRGB/linear conversion, named `Color`s, OKLab palette matching, dithering, SGR colour codes |
 | `glyphs.py`     | glyph sets (half, quad, sextant, ascii) and matching pixels to cells |
 | `keys.py`       | `Key` codes, `MouseEvent`, the VT input decoder |
-| `console.py`    | raw terminal I/O for POSIX (termios) and Windows (console API), colour and glyph detection |
+| `console.py`    | raw terminal I/O for POSIX (termios) and Windows (console API), `WindowsInput` (console key and mouse records to VT sequences), colour and glyph detection |
 | `terminal.py`   | `Screen` (cell grid, text, frames, diffed output), `run`, command-line display flags |
-| `dice.py`       | pip-textured die, `orientation_showing`, `top_face`, `RollAnimation` (result chosen first, then animated to land on it) |
+| `shapes.py`     | mesh builders: `text_mesh` (extruded text in any bitmap font), `bitmap_mesh`, `blob_mesh` (ellipsoid), `block_mesh`, `pillow_mesh` (a 2D shape puffed into a cushion), `merge_meshes` |
+| `examples/dice.py`   | pip-textured die, `orientation_showing`, `top_face`, `RollAnimation` (result chosen first, then animated to land on it); zombieDice builds its dice on it |
+| `examples/demo.py`   | the dice roll demo (`python3 -m unicode3d`) |
+| `examples/viewer.py` | the model viewer |
 
 ### Using it in a game
 
@@ -259,7 +274,15 @@ drawn as a box), so sextants are picked by terminal, never by guessing at fonts.
 `render()` returns the renderer's own `FrameBuffer`, which the next render reuses; `copy()` it to
 cache a frame (as the Dice Kept tokens do). `fb.ids` tells you which object (its index in the render
 list plus one) covers each pixel, which is handy for mouse picking. `renderer.project(point)` gives
-the cell a world point landed on, for placing text labels.
+the cell a world point landed on, for placing text labels. An unchanged scene isn't drawn again:
+`render()` hands back the last frame, and `renderer.draws` counts only the renders that rasterized.
+
+**Shapes.** `unicode3d.shapes` builds meshes to use with `Object3D`: `text_mesh(text, font)` extrudes
+text in a bitmap font you supply (`{char: ["#..#", ...]}`, every glyph the same height) and returns
+`(mesh, width)`; `bitmap_mesh(cells)` does the same for any boolean grid; `blob_mesh(radii, center)`
+is an ellipsoid with an optional bump function; `block_mesh(center, size, rotation)` a box;
+`pillow_mesh(shape)` puffs a 2D inside/outside function into a cushion with texture coordinates
+that line up with the shape; and `merge_meshes(meshes)` joins them into one.
 
 **Colours and light.** `Object3D.color` takes a named `Color` or an `(r, g, b)` triple (0..255 ints
 or 0..1 floats). `Light` levels (`ambient`, `diffuse`, `specular`) are perceived brightness from 0
@@ -267,8 +290,8 @@ to 1; the highlight is always white, so lower `specular` for large flat faces th
 wash out.
 
 **`Screen` and `run()`.** `run(frame_fn, fps=30, glyphs=None, color=None, mouse=False,
-background=None, title=None)` takes over the terminal (naming its window `title`, if given) and restores it however the loop ends (Ctrl-C raises
-`KeyboardInterrupt`). `frame_fn(screen, dt, keys)` returns `False` to stop. `keys` holds ints (a
+background=None, title=None)` takes over the terminal (naming its window `title`, if given) and
+restores it however the loop ends (Ctrl-C raises `KeyboardInterrupt`). `frame_fn(screen, dt, keys)` returns `False` to stop. `keys` holds ints (a
 character's code, or a `Key` such as `Key.UP`, `Key.ENTER`, `Key.ESC`) and, with `mouse=True`,
 `MouseEvent(x, y, button, pressed)` values. `screen.text()` draws in the terminal's own ANSI colours,
 so text follows the user's theme. Characters that aren't exactly one cell wide are shown as `?`.
@@ -280,15 +303,16 @@ exactly; by default, edges blend toward black over the terminal's own background
 terminal can take), and `screen.fps` is the target frame rate, which `run()` re-reads every frame;
 `screen.measured_fps` is the rate it achieved over the last second.
 
-**Performance.** At 30 fps, a 60x15-cell view of three dice takes about 5-7 ms per frame and an
-80x16 title logo 12-16 ms, from half blocks to sextants. Cost grows with the pixel count, so large
-views in `sextant` mode are the most expensive (about 21 ms for a 150x45 view of three rolling
-dice, against 15 ms in `quad`). A scene that hasn't changed since the last `render()` (same objects,
+**Performance.** Rendering a frame and building its screen update takes about 6-7 ms for a
+60x15-cell view of three rolling dice and 10-12 ms for an 80x16 title logo, from half blocks to
+sextants. Cost grows with the pixel count, so large views in `sextant` mode are the most expensive:
+a 150x45 view of three rolling dice takes about 26 ms, against 20 ms in `quad` and 13 ms in `half`. A scene that hasn't changed since the last `render()` (same objects,
 poses, camera, light and size) isn't drawn again, so still frames cost a few milliseconds; after
 editing a mesh's arrays in place, call `renderer.invalidate()`. Use `quad` if frames drop.
 
 **Windows release.** `.github/workflows/windows-release.yml` builds the zip on a Windows runner
-whenever a `v*` tag is pushed, and publishes it as a GitHub release. The exe is `python.exe` from
+whenever a `v*` tag is pushed, and publishes it as a GitHub release; run by hand, it builds and
+tests without publishing. The exe is `python.exe` from
 python.org's embeddable package, renamed, so the only executable is the one signed by the Python
 Software Foundation. SmartScreen and Defender have no unknown or packed program to flag, as they often
 do with PyInstaller bundles. `ZombieDice._pth` enables the site module, and a `.pth` file starts

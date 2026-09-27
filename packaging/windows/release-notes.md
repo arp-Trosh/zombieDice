@@ -20,7 +20,11 @@ The included README.txt covers controls, multiplayer and sharper graphics.
 
 ### Linux / macOS
 
+From the source code (Python 3.10 or later):
+
 ```sh
-pip install numpy
+git clone https://github.com/arp-Trosh/zombieDice
+cd zombieDice
+pip install -r requirements.txt
 python3 -m zombie
 ```

@@ -16,7 +16,8 @@ STARTING
 
 PLAYING
   R roll, S stop and bank your brains, T or Tab chat, Q leave (press twice).
-  Arrow keys + Enter, or the mouse, work the buttons. Rules are in the game's README:
+  F switches the bots' speed in single player; P plays again once a game is over (host).
+  Left/Right arrows + Enter, or the mouse, work the buttons. Rules are in the game's README:
   https://github.com/arp-Trosh/zombieDice
 
 MULTIPLAYER
@@ -37,6 +38,7 @@ SHARPER GRAPHICS
       ZombieDice.exe
   If you ever see boxes or question marks instead of dice (for instance after changing Windows
   Terminal's font), close it and run the same way with UNICODE3D_GLYPHS=quad.
-  Your player name is your Windows user name; to use another one, run
+  Your player name is your Windows user name. You can change it on the Multiplayer screen, or
+  set it for every game by running
       set ZOMBIEDICE_NAME=YourName
   before ZombieDice.exe the same way.

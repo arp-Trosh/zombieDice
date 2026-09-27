@@ -5,7 +5,6 @@ import unittest
 import numpy as np
 
 from zombie import bots
-from zombie.graphics import text_mesh
 from zombie.rules import BRAIN, CUP, FACES, FEET, GREEN, RED, SHOTGUN, WINNING_SCORE, YELLOW, Game, Player
 from zombie.session import ClientSession, HostSession, host_session, single_player_session
 
@@ -316,15 +315,6 @@ class SessionTests(unittest.TestCase):
             host.close()
 
 class GraphicsTests(unittest.TestCase):
-    def test_text_mesh_is_closed(self):
-        # Every edge of a closed, consistently wound mesh is shared by exactly two triangles in opposite directions
-        # -- except where merged runs create T-junctions, so just check the volume is right instead.
-        mesh, width = text_mesh("I", depth=1.0)
-        v = mesh.vertices[mesh.faces]
-        volume = abs(np.einsum("ij,ij->i", v[:, 0], np.cross(v[:, 1], v[:, 2])).sum()) / 6
-        self.assertAlmostEqual(volume, 11.0)  # "I" has 11 pixels
-        self.assertEqual(width, 3)
-
     def test_kept_tokens_fill_their_cells(self):
         from zombie.graphics import KeptDice, token_mesh
 
