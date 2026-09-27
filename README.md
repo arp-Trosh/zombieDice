@@ -14,7 +14,7 @@ python3 -m zombie [--name NAME]                  # the game (needs an 80x24 term
 ```
 
 Your player name defaults to your login name; `--name` (or the Multiplayer screen) changes it. The
-first start compiles the 3D renderer, which takes about 10 seconds ("First run compile, please
+first start compiles the 3D renderer, which takes 10-20 seconds ("First run compile, please
 wait..."); later starts are quick.
 
 **Windows, no Python needed:** download `ZombieDice-<version>-windows-x64.zip` from the

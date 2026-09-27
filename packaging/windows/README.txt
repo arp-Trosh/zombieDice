@@ -7,7 +7,7 @@ STARTING
   1. Extract the whole zip first (right-click > Extract All). Don't run it from inside the zip.
   2. Open the ZombieDice folder and double-click ZombieDice.exe.
 
-  The first start takes about 10 seconds ("First run compile, please wait..."): the 3D graphics
+  The first start takes 10-20 seconds ("First run compile, please wait..."): the 3D graphics
   are compiled for your PC once and kept in the folder, so later starts are quick.
 
   It needs Windows 10 or 11 and a window of at least 80x24. Windows Terminal (the default on

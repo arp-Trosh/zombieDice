@@ -10,7 +10,7 @@ against up to 7 computer zombies, or with friends over your network.
 3. Open the `ZombieDice` folder and double-click **ZombieDice.exe**.
 
 Needs Windows 10 or 11; nothing to install. Windows Terminal (the default on Windows 11) looks best.
-The first start takes about 10 seconds while the 3D graphics are compiled for your PC; later starts
+The first start takes 10-20 seconds while the 3D graphics are compiled for your PC; later starts
 are quick.
 
 `ZombieDice.exe` is the official `python.exe` from python.org's embeddable package, renamed and
