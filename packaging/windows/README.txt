@@ -52,5 +52,5 @@ LICENSES
   texts (COPYING, COPYING.LESSER) are in Lib\site-packages\unicode3d and
   Lib\site-packages\unicode3d-*.dist-info\licenses; you may replace it with your own version.
   Python (python.org), numpy (numpy.org), Numba (numba.pydata.org) and llvmlite come with their
-  own licenses, in the same places. msvcp140.dll is Microsoft's C++ runtime, included as Microsoft's
-  Visual C++ Redistributable license allows.
+  own licenses, in the same places. msvcp140.dll and vcomp140.dll are Microsoft's C++ and OpenMP
+  runtimes, included as Microsoft's Visual C++ Redistributable license allows.

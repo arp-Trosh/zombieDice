@@ -42,18 +42,26 @@ $site = Join-Path $app "Lib\site-packages"
 python -m pip install --disable-pip-version-check --no-compile --only-binary=:all: --target $site "numpy>=1.26" "numba>=0.61"
 # pip adds command-line launchers (f2py.exe, numba.exe, ...) there: unsigned exes the game never uses.
 Remove-Item -Recurse -Force (Join-Path $site "bin") -ErrorAction SilentlyContinue
+# Their test suites (about 14 MB) are never used by the game.
+foreach ($package in "numpy", "numba", "llvmlite") {
+    Get-ChildItem (Join-Path $site $package) -Recurse -Directory -Filter "tests" | Remove-Item -Recurse -Force
+}
 
 Write-Host "== C++ runtime"
-# Numba's extension modules need MSVCP140.dll, which comes with the Visual C++ Redistributable rather than
-# with Windows or the embeddable Python (that has only VCRUNTIME140*.dll). Most PCs have it, but not all, so
-# the release carries its own copy next to the exe, where Windows looks first. Microsoft allows this
-# app-local copy; it is taken from this machine's System32 and must be signed by Microsoft.
-$msvcp = Join-Path $env:SystemRoot "System32\msvcp140.dll"
-$sig = Get-AuthenticodeSignature $msvcp
-if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
-    throw "$msvcp is not validly signed by Microsoft: $($sig.Status) $($sig.SignerCertificate.Subject)"
+# Numba's extension modules need MSVCP140.dll, and its OpenMP thread pool VCOMP140.dll. Both come with the
+# Visual C++ Redistributable rather than with Windows or the embeddable Python (that has only
+# VCRUNTIME140*.dll). Most PCs have it, but not all: without MSVCP140 the game couldn't start, and without
+# VCOMP140 Numba would quietly use another thread pool than the one tested here. So the release carries its
+# own copies next to the exe, where Windows looks first. Microsoft allows these app-local copies; they are
+# taken from this machine's System32 and must be signed by Microsoft.
+foreach ($dll in "msvcp140.dll", "vcomp140.dll") {
+    $path = Join-Path $env:SystemRoot "System32\$dll"
+    $sig = Get-AuthenticodeSignature $path
+    if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
+        throw "$path is not validly signed by Microsoft: $($sig.Status) $($sig.SignerCertificate.Subject)"
+    }
+    Copy-Item $path $app
 }
-Copy-Item $msvcp $app
 
 Write-Host "== unicode3d"
 # The engine, at the version requirements.txt pins. Its wheel carries its license files (LGPL).

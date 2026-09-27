@@ -54,12 +54,15 @@ def selftest():
     print(f"  kernels compiled or loaded in {time.perf_counter() - start:.1f} s, on {numba.get_num_threads()} threads "
           f"({numba.threading_layer()} threading layer)")
     if os.name == "nt":
-        # Numba needs the C++ runtime: it must be the release's own copy, or PCs without the
-        # Visual C++ Redistributable couldn't run the game.
-        msvcp = loaded_dll("msvcp140.dll")
-        print(f"  C++ runtime: {msvcp}")
+        # Numba needs the C++ runtime and, for its OpenMP thread pool, the OpenMP runtime: both must be
+        # the release's own copies, or PCs without the Visual C++ Redistributable would fail to start
+        # (MSVCP140) or run on another thread pool than the one tested here (VCOMP140).
         here = os.path.dirname(os.path.abspath(sys.executable))
-        assert msvcp and os.path.dirname(os.path.abspath(msvcp)).lower() == here.lower(), msvcp
+        for dll in ("msvcp140.dll", "vcomp140.dll"):
+            path = loaded_dll(dll)
+            print(f"  {dll}: {path}")
+            assert path and os.path.dirname(os.path.abspath(path)).lower() == here.lower(), path
+        assert numba.threading_layer() == "omp", numba.threading_layer()
     dice = [(GREEN, BRAIN), (YELLOW, FEET), (RED, SHOTGUN)]
     for glyphs in ("half", "quad", "sextant", "ascii"):
         for color in ("truecolor", "256", "16"):
