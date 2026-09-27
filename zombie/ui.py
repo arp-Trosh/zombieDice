@@ -1,5 +1,5 @@
 """Screens: main menu, multiplayer setup, lobby and the game table."""
-from unicode3d.color import Color
+from unicode3d.color import COLOR_MODES, Color
 from unicode3d.keys import Key, MouseEvent
 
 from .graphics import DIE_COLOR, DiceTray, KeptDice
@@ -14,6 +14,24 @@ ESC, TAB = 27, 9
 NAME_COLORS = (Color.CYAN, Color.MAGENTA, Color.YELLOW, Color.GREEN, Color.BLUE, Color.RED)
 FACE_WORD = {BRAIN: "brain", SHOTGUN: "shotgun", FEET: "footsteps"}
 FACE_CHAR = {BRAIN: "B", SHOTGUN: "X", FEET: "F"}
+FPS_STEPS = (30, 60, 120, 144)
+# Status line fields: the longest glyph set, colour mode and "achieved/target" frame rate.
+STATUS_WIDTHS = (len("sextant"), len("truecolor"), len("144/144fps"))
+STATUS_WIDTH = sum(3 + w for w in STATUS_WIDTHS) + 2 * (len(STATUS_WIDTHS) - 1)  # "F2 " before each, 2 between
+
+
+class ViewArea:
+    """The screen as a view sees it: everything but the bottom row, which the App keeps for its status line."""
+
+    def __init__(self, screen):
+        self._screen = screen
+
+    def __getattr__(self, name):
+        return getattr(self._screen, name)
+
+    def size(self):
+        rows, cols = self._screen.size()
+        return rows - 1, cols
 
 
 class Click:
@@ -101,6 +119,18 @@ class Toggle:
         if suffix:
             screen.text(y, x + 8, suffix, dim=True)
         view.hits.append((y, x, x + 7, self.flip))
+
+
+def cycle(options, current):
+    """The option after `current`, wrapping round; for a number not listed, the next one up."""
+    if current in options:
+        return options[(options.index(current) + 1) % len(options)]
+    return next((o for o in options if o > current), options[0])
+
+
+def button_row_width(buttons):
+    """Columns View.button_row takes for these buttons: "[ label ]" each, one space between."""
+    return sum(len(label) + 4 for label, _, _ in buttons) + len(buttons) - 1
 
 
 def draw_box(screen, top, left, height, width, title=None, color=Color.DEFAULT):
@@ -726,17 +756,22 @@ class GameView(SessionView):
     def single_player(self):
         return self.session.is_host and self.session.server is None
 
-    def buttons(self):
-        leave = ("Really leave? (Q)" if self.confirm_leave else "Leave (Q)", self.request_leave, True)
+    def buttons(self, compact=False):
+        """[(label, action, enabled)]; compact labels, key first, for narrow terminals."""
+        label = (lambda full, short: short) if compact else (lambda full, short: full)
+        leave = (label("Really leave? (Q)", "Q Leave?") if self.confirm_leave else label("Leave (Q)", "Q Leave"),
+                 self.request_leave, True)
         if self.shown and self.shown["phase"] == "over":
             if self.session.is_host:
-                return [("Play Again (P)", self.play_again, True), leave]
+                return [(label("Play Again (P)", "P Again"), self.play_again, True), leave]
             return [leave]
         mine = self.my_turn
         rolled = bool(self.shown and self.shown["turn"]["rolls"] > 0)
-        buttons = [("Roll Dice (R)", self.roll, mine), ("Stop & Eat Brains (S)", self.stop, mine and rolled)]
+        buttons = [(label("Roll Dice (R)", "R Roll"), self.roll, mine),
+                   (label("Stop & Eat Brains (S)", "S Stop"), self.stop, mine and rolled)]
         if self.single_player:
-            buttons.append((f"Speed x{3 if self.session.speed > 1 else 1} (F)", self.toggle_speed, True))
+            speed = 3 if self.session.speed > 1 else 1
+            buttons.append((label(f"Speed x{speed} (F)", f"F x{speed}"), self.toggle_speed, True))
         return buttons + [leave]
 
     def key(self, k):
@@ -785,6 +820,8 @@ class GameView(SessionView):
         screen.text(tray_h, 0, "-" * (main_w - 1))
         self.draw_status(screen, tray_h + 1, main_w - 2)
         buttons = self.buttons()
+        if button_row_width(buttons) > main_w - 2:  # the row ends where the scoreboard begins
+            buttons = self.buttons(compact=True)
         self.focus %= len(buttons)
         self.button_row(screen, chat_top - 1, 1, buttons, None if self.chatting else self.focus)
         self.draw_scoreboard(screen, 0, main_w - 1, chat_top, side_w + 1)
@@ -930,16 +967,55 @@ class App:
         self.view = MenuView(self)
 
     def frame(self, screen, dt, keys):
-        keys = self.translate_mouse(keys)
+        display = {Key.F2: self.cycle_glyphs, Key.F3: self.cycle_color, Key.F4: self.cycle_fps}
+        view_keys = []
+        for k in self.translate_mouse(keys):
+            if isinstance(k, int) and k in display:
+                display[k](screen)
+            else:
+                view_keys.append(k)
         self.view.tick(dt)
         rows, cols = screen.size()
         if rows < MIN_ROWS or cols < MIN_COLS:
             screen.erase()
             screen.text(0, 0, f"Please enlarge the terminal to at least {MIN_COLS}x{MIN_ROWS} (now {cols}x{rows}).")
         else:
-            self.view.frame(screen, dt, keys)
+            self.view.frame(ViewArea(screen), dt, view_keys)
+        self.draw_status_line(screen)
         screen.refresh()
         return self.running
+
+    # F2/F3/F4 work on every screen, since function keys can't clash with typing a name or a chat line.
+    @staticmethod
+    def cycle_glyphs(screen):
+        screen.set_glyphs(cycle(screen.glyph_modes, screen.mode))
+
+    @staticmethod
+    def cycle_color(screen):
+        screen.set_color(cycle(COLOR_MODES, screen.color_mode))
+
+    @staticmethod
+    def cycle_fps(screen):
+        screen.fps = cycle(FPS_STEPS, screen.fps)
+
+    def draw_status_line(self, screen):
+        """The bottom row: glyphs, colours and frame rate (achieved/target), each clickable to change it.
+
+        Every field is as wide as its longest value, so nothing moves as the values change.
+        """
+        rows, cols = screen.size()
+        measured = "--" if screen.measured_fps is None else f"{min(screen.measured_fps, 999):.0f}"
+        fields = (("F2", screen.mode, STATUS_WIDTHS[0], self.cycle_glyphs),
+                  ("F3", screen.color_mode, STATUS_WIDTHS[1], self.cycle_color),
+                  ("F4", f"{measured}/{screen.fps}fps", STATUS_WIDTHS[2], self.cycle_fps))
+        x = max(cols - STATUS_WIDTH - 1, 0)
+        y = rows - 1
+        screen.text(y, 0, " " * cols)
+        for key, value, width, action in fields:
+            screen.text(y, x, key, dim=True)
+            screen.text(y, x + 3, f"{value:<{width}}", dim=True)
+            self.view.hits.append((y, x, x + 3 + width, lambda action=action: action(screen)))
+            x += 3 + width + 2
 
     @staticmethod
     def translate_mouse(keys):

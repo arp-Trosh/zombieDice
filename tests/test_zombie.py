@@ -354,6 +354,60 @@ class GraphicsTests(unittest.TestCase):
         self.assertTrue(all((a > 0).any() for a in screen.frames))
 
 
+class DisplaySettingsTests(unittest.TestCase):
+    def app_frame(self, app, screen, keys=()):
+        app.frame(screen, 1 / 30, list(keys))
+        return "".join(screen.chars[-1])
+
+    def test_cycle(self):
+        from zombie.ui import FPS_STEPS, cycle
+        self.assertEqual(cycle(FPS_STEPS, 30), 60)
+        self.assertEqual(cycle(FPS_STEPS, 144), 30)
+        self.assertEqual(cycle(FPS_STEPS, 45), 60)   # not listed: the next one up
+        self.assertEqual(cycle(FPS_STEPS, 200), 30)
+
+    def test_function_keys_cycle_the_display(self):
+        from unicode3d.keys import Key
+        from unicode3d.terminal import Screen
+        from zombie.ui import App
+        app, screen = App("Tester"), Screen(glyphs="quad", color="truecolor", size=(30, 100))
+        self.assertTrue(self.app_frame(app, screen).endswith("F2 quad     F3 truecolor  F4 --/30fps   "))
+        self.app_frame(app, screen, [Key.F2, Key.F3, Key.F4])
+        self.assertEqual((screen.mode, screen.color_mode, screen.fps), ("sextant", "256", 60))
+        screen.measured_fps = 41.0
+        self.assertTrue(self.app_frame(app, screen).endswith("F2 sextant  F3 256        F4 41/60fps   "))
+
+    def test_game_buttons_fit_narrow_terminals(self):
+        from unicode3d.terminal import Screen
+        from zombie.ui import App, GameView
+        for cols, row in ((80, "[ R Roll ] [ S Stop ] [ F x1 ] [ Q Leave ]"),
+                          (130, "[ Roll Dice (R) ] [ Stop & Eat Brains (S) ] [ Speed x1 (F) ] [ Leave (Q) ]")):
+            app = App("Me")
+            app.view = GameView(app, single_player_session("Me", rng=random.Random(3), delays=(0, 0)))
+            screen = Screen(glyphs="quad", color="truecolor", size=(24, cols))
+            app.frame(screen, 1 / 30, [])
+            self.assertTrue(any(row in "".join(line) for line in screen.chars), cols)
+            app.close()
+
+    def test_status_line_stays_put(self):
+        from unicode3d.keys import Key
+        from unicode3d.terminal import Screen
+        from zombie.ui import App
+        app, screen = App("Tester"), Screen(glyphs="half", color="mono", size=(24, 80))
+        screen.fps = 144
+        starts = set()
+        for glyphs in screen.glyph_modes:
+            for color in ("truecolor", "16"):
+                for measured in (None, 7.0, 143.6):
+                    screen.set_glyphs(glyphs)
+                    screen.set_color(color)
+                    screen.measured_fps = measured
+                    row = self.app_frame(app, screen)
+                    starts.add(tuple(row.index(k) for k in ("F2", "F3", "F4")))
+        self.assertEqual(len(starts), 1)
+        # The menu's own bottom line moves up a row rather than being covered.
+        self.assertIn("Up/Down + Enter, or click", "".join(screen.chars[-2]))
+
 import numpy as np  # noqa: E402
 
 if __name__ == "__main__":

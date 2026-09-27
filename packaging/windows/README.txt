@@ -28,11 +28,15 @@ MULTIPLAYER
   on networks: allow it on Private networks. Joining a game and single player never ask.
 
 SHARPER GRAPHICS
-  For finer detail, if your font has the characters (Cascadia, Windows Terminal's default, does),
-  open a Command Prompt in the ZombieDice folder and run:
+  F2, F3 and F4 cycle the graphics, colours and frame rate while you play; the bottom line
+  always shows the current settings and the frame rate achieved.
+  In Windows Terminal the game uses its finest graphics automatically. In the classic console it
+  uses a coarser set that works with any font; if your console font is Cascadia, you can ask for
+  the finer one: open a Command Prompt in the ZombieDice folder and run
       set UNICODE3D_GLYPHS=sextant
       ZombieDice.exe
-  If you see boxes or question marks instead of dice, close it and start the game normally.
+  If you ever see boxes or question marks instead of dice (for instance after changing Windows
+  Terminal's font), close it and run the same way with UNICODE3D_GLYPHS=quad.
   Your player name is your Windows user name; to use another one, run
       set ZOMBIEDICE_NAME=YourName
   before ZombieDice.exe the same way.

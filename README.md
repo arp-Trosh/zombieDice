@@ -17,14 +17,19 @@ python3 -m zombie [--name NAME]   # the game (needs an 80x24 terminal; bigger lo
 `ZombieDice.exe`. With Python installed you can also run it from source (`py -m zombie`). The display
 is detected automatically; these flags (on the game and both demos) override it:
 
-- `--glyphs quad|sextant|half|ascii`: how finely cells are divided. `quad` (the default) works with any
-  font. `sextant` shows the most detail but needs a font with the Unicode 13 "legacy computing" block
-  symbols, such as Cascadia Code/Mono (Windows Terminal's default font) or Iosevka; kitty and WezTerm
-  draw them themselves. If you see boxes or question marks, go back to `quad`.
+- `--glyphs sextant|quad|half|ascii`: how finely cells are divided. `sextant` shows the most detail
+  but needs the Unicode 13 "legacy computing" block symbols, so it is the default only in terminals
+  known to show them: Windows Terminal (its font, Cascadia, has them), kitty, WezTerm, foot and
+  Ghostty. Everywhere else the default is `quad`, which works with any font. If you see boxes or
+  question marks, use `--glyphs quad`.
 - `--color truecolor|256|16|mono`: colour depth.
 - `--ascii`: plain characters, for terminals without Unicode.
 
-The environment variables `UNICODE3D_GLYPHS` and `UNICODE3D_COLOR` set the same things.
+The environment variables `UNICODE3D_GLYPHS` and `UNICODE3D_COLOR` set the same things. While
+playing, on any screen, `F2` cycles the glyphs (half, quad, sextant, ascii), `F3` the colours
+(truecolor, 256, 16, mono) and `F4` the frame rate (30, 60, 120, 144). The bottom row is a status
+line that always shows the current settings, each field at a fixed width so nothing moves, and the
+frame rate as achieved/target (e.g. `41/60fps`); click a setting to change it.
 
 - **Single Player**: pick the number of players (2-8, default 6), then play against that many
   computer zombies minus you.
@@ -230,11 +235,14 @@ the `--glyphs`/`--color` flags from `add_display_args`, or `UNICODE3D_GLYPHS`/`U
 | `256` | `TERM` contains `256` |
 | `mono` | `NO_COLOR` is set or `TERM=dumb` (glyphs then default to `ascii`, which still shows shading) |
 | `16` | anything else |
-| `quad` glyphs | UTF-8 locale (always on Windows) |
+| `sextant` glyphs | a terminal known to show sextants whatever the font: Windows Terminal (`WT_SESSION`), kitty, WezTerm, foot or Ghostty (by `TERM`, `TERM_PROGRAM` or their own variables) |
+| `quad` glyphs | any other terminal with a UTF-8 locale (always on Windows) |
 | `half` glyphs | the Linux text console (`TERM=linux`), whose fonts lack quadrants |
 | `ascii` glyphs | no UTF-8 |
 
-`sextant` is never picked automatically, because it depends on the font.
+A program can't ask a terminal which characters its font has (a missing one still takes a cell,
+drawn as a box), so sextants are picked by terminal, never by guessing at fonts.
+`console.shows_sextants()` holds the list.
 
 **`Renderer(width, height, cell_pixels=(1, 2), ...)` options:**
 
@@ -267,12 +275,17 @@ so text follows the user's theme. Characters that aren't exactly one cell wide a
 `background=(r, g, b)` fills the screen with a known colour so anti-aliased edges blend into it
 exactly; by default, edges blend toward black over the terminal's own background.
 `Screen(size=(rows, cols))` with no console gives an off-screen grid for tests;
-`render_updates()` returns the escape sequences a refresh would send.
+`render_updates()` returns the escape sequences a refresh would send. `screen.set_glyphs(name)` and
+`screen.set_color(mode)` switch modes while running (`screen.glyph_modes` lists the glyph sets the
+terminal can take), and `screen.fps` is the target frame rate, which `run()` re-reads every frame;
+`screen.measured_fps` is the rate it achieved over the last second.
 
 **Performance.** At 30 fps, a 60x15-cell view of three dice takes about 5-7 ms per frame and an
 80x16 title logo 12-16 ms, from half blocks to sextants. Cost grows with the pixel count, so large
-views in `sextant` mode are the most expensive (about 37 ms for a 150x45 view). Lower
-`edge_samples` or use `quad` if frames drop.
+views in `sextant` mode are the most expensive (about 21 ms for a 150x45 view of three rolling
+dice, against 15 ms in `quad`). A scene that hasn't changed since the last `render()` (same objects,
+poses, camera, light and size) isn't drawn again, so still frames cost a few milliseconds; after
+editing a mesh's arrays in place, call `renderer.invalidate()`. Use `quad` if frames drop.
 
 **Windows release.** `.github/workflows/windows-release.yml` builds the zip on a Windows runner
 whenever a `v*` tag is pushed, and publishes it as a GitHub release. The exe is `python.exe` from
@@ -285,4 +298,5 @@ through ConPTY (the console layer Windows Terminal uses) before publishing. The 
 `packaging/windows/`.
 
 **Windows.** Needs Windows 10 or later (for VT sequences in the console) and only numpy. Windows
-Terminal is recommended; the classic console works too, but its default fonts may lack sextants.
+Terminal is recommended, and gets sextants by default; the classic console works too, with quadrants
+(its default fonts may lack sextants).
