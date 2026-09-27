@@ -1,2 +1,2 @@
 numpy>=1.26
-unicode3d @ git+https://github.com/arp-Trosh/unicode3d@v0.1.0
+unicode3d @ git+https://github.com/arp-Trosh/unicode3d@v0.2.0

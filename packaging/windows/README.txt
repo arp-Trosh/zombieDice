@@ -7,6 +7,9 @@ STARTING
   1. Extract the whole zip first (right-click > Extract All). Don't run it from inside the zip.
   2. Open the ZombieDice folder and double-click ZombieDice.exe.
 
+  The first start takes about 10 seconds ("First run compile, please wait..."): the 3D graphics
+  are compiled for your PC once and kept in the folder, so later starts are quick.
+
   It needs Windows 10 or 11 and a window of at least 80x24. Windows Terminal (the default on
   Windows 11, and free in the Microsoft Store for Windows 10) looks best. Nothing to install;
   to uninstall, delete the folder.
@@ -48,4 +51,6 @@ LICENSES
   software under the GNU Lesser General Public License, version 3 or later. Its source and license
   texts (COPYING, COPYING.LESSER) are in Lib\site-packages\unicode3d and
   Lib\site-packages\unicode3d-*.dist-info\licenses; you may replace it with your own version.
-  Python (python.org) and numpy (numpy.org) come with their own licenses, in the same places.
+  Python (python.org), numpy (numpy.org), Numba (numba.pydata.org) and llvmlite come with their
+  own licenses, in the same places. msvcp140.dll is Microsoft's C++ runtime, included as Microsoft's
+  Visual C++ Redistributable license allows.

@@ -19,15 +19,47 @@ import sys
 import traceback
 
 
+def loaded_dll(name):
+    """Full path of a DLL loaded into this process, or None (Windows only)."""
+    import ctypes
+    from ctypes import wintypes
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.GetModuleHandleW.restype = wintypes.HMODULE
+    k32.GetModuleHandleW.argtypes = [wintypes.LPCWSTR]
+    k32.GetModuleFileNameW.argtypes = [wintypes.HMODULE, wintypes.LPWSTR, wintypes.DWORD]
+    handle = k32.GetModuleHandleW(name)
+    if not handle:
+        return None
+    buf = ctypes.create_unicode_buffer(1024)
+    k32.GetModuleFileNameW(handle, buf, len(buf))
+    return buf.value
+
+
 def selftest():
+    import time
+
+    import numba
     import numpy as np
 
+    import unicode3d
     from unicode3d.console import WindowsConsole
     from unicode3d.terminal import Screen
     from zombie.graphics import DiceTray, KeptDice, TitleLogo
     from zombie.rules import BRAIN, FEET, GREEN, RED, SHOTGUN, YELLOW
 
-    print(f"Python {sys.version.split()[0]} at {sys.executable}; numpy {np.__version__}")
+    print(f"Python {sys.version.split()[0]} at {sys.executable}; numpy {np.__version__}, numba {numba.__version__}, "
+          f"unicode3d {unicode3d.__version__}")
+    start = time.perf_counter()
+    unicode3d.compile_kernels()
+    print(f"  kernels compiled or loaded in {time.perf_counter() - start:.1f} s, on {numba.get_num_threads()} threads "
+          f"({numba.threading_layer()} threading layer)")
+    if os.name == "nt":
+        # Numba needs the C++ runtime: it must be the release's own copy, or PCs without the
+        # Visual C++ Redistributable couldn't run the game.
+        msvcp = loaded_dll("msvcp140.dll")
+        print(f"  C++ runtime: {msvcp}")
+        here = os.path.dirname(os.path.abspath(sys.executable))
+        assert msvcp and os.path.dirname(os.path.abspath(msvcp)).lower() == here.lower(), msvcp
     dice = [(GREEN, BRAIN), (YELLOW, FEET), (RED, SHOTGUN)]
     for glyphs in ("half", "quad", "sextant", "ascii"):
         for color in ("truecolor", "256", "16"):

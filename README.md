@@ -1,6 +1,6 @@
 # zombieDice
 
-Terminal dice game rendered in 3D with Unicode block characters in 24-bit colour, using only numpy.
+Terminal dice game rendered in 3D with Unicode block characters in 24-bit colour, in Python with numpy and Numba.
 Runs in Windows Terminal and in Linux/macOS terminals. The 3D graphics come from
 [unicode3d](https://github.com/arp-Trosh/unicode3d), a separate terminal renderer that falls back to
 256 or 16 colours and to ASCII on terminals that need it.
@@ -9,11 +9,13 @@ Runs in Windows Terminal and in Linux/macOS terminals. The 3D graphics come from
 
 ```sh
 python3 -m venv .venv && . .venv/bin/activate   # Windows: py -m venv .venv; .venv\Scripts\activate
-pip install -r requirements.txt                  # numpy and unicode3d (Python 3.10 or later)
+pip install -r requirements.txt                  # numpy, Numba and unicode3d (Python 3.10 or later)
 python3 -m zombie [--name NAME]                  # the game (needs an 80x24 terminal; bigger looks better)
 ```
 
-Your player name defaults to your login name; `--name` (or the Multiplayer screen) changes it.
+Your player name defaults to your login name; `--name` (or the Multiplayer screen) changes it. The
+first start compiles the 3D renderer, which takes about 10 seconds ("First run compile, please
+wait..."); later starts are quick.
 
 **Windows, no Python needed:** download `ZombieDice-<version>-windows-x64.zip` from the
 [Releases page](https://github.com/arp-Trosh/zombieDice/releases), extract it, and double-click

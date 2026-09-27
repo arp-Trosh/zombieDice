@@ -5,8 +5,8 @@
 # zombiedice_launch.py). Nothing is packed, compressed or self-extracting, which is what makes
 # bundlers like PyInstaller trip antivirus heuristics.
 #
-# Run from the repository root with the same Python version and git on PATH (it installs numpy
-# and unicode3d for it):
+# Run from the repository root with the same Python version and git on PATH (it installs numpy,
+# Numba and unicode3d for it):
 #   pwsh packaging/windows/build.ps1 -Version 1.0.0
 param(
     [string]$Version = "dev",
@@ -36,11 +36,24 @@ Remove-Item (Join-Path $app "pythonw.exe"), (Join-Path $app "python$tag._pth")
 @("python$tag.zip", ".", "app", "Lib\site-packages", "import site") |
     Set-Content -Encoding ascii (Join-Path $app "$name._pth")
 
-Write-Host "== numpy"
+Write-Host "== numpy, Numba (with llvmlite)"
+# One install, so pip picks a numpy that this Numba supports.
 $site = Join-Path $app "Lib\site-packages"
-python -m pip install --disable-pip-version-check --no-compile --only-binary=:all: --target $site "numpy>=1.26"
-# pip adds command-line launchers (f2py.exe, numpy-config.exe) there: unsigned exes the game never uses.
+python -m pip install --disable-pip-version-check --no-compile --only-binary=:all: --target $site "numpy>=1.26" "numba>=0.61"
+# pip adds command-line launchers (f2py.exe, numba.exe, ...) there: unsigned exes the game never uses.
 Remove-Item -Recurse -Force (Join-Path $site "bin") -ErrorAction SilentlyContinue
+
+Write-Host "== C++ runtime"
+# Numba's extension modules need MSVCP140.dll, which comes with the Visual C++ Redistributable rather than
+# with Windows or the embeddable Python (that has only VCRUNTIME140*.dll). Most PCs have it, but not all, so
+# the release carries its own copy next to the exe, where Windows looks first. Microsoft allows this
+# app-local copy; it is taken from this machine's System32 and must be signed by Microsoft.
+$msvcp = Join-Path $env:SystemRoot "System32\msvcp140.dll"
+$sig = Get-AuthenticodeSignature $msvcp
+if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
+    throw "$msvcp is not validly signed by Microsoft: $($sig.Status) $($sig.SignerCertificate.Subject)"
+}
+Copy-Item $msvcp $app
 
 Write-Host "== unicode3d"
 # The engine, at the version requirements.txt pins. Its wheel carries its license files (LGPL).
