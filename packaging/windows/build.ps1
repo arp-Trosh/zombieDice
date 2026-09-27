@@ -5,7 +5,8 @@
 # zombiedice_launch.py). Nothing is packed, compressed or self-extracting, which is what makes
 # bundlers like PyInstaller trip antivirus heuristics.
 #
-# Run from the repository root with the same Python version on PATH (it installs numpy for it):
+# Run from the repository root with the same Python version and git on PATH (it installs numpy
+# and unicode3d for it):
 #   pwsh packaging/windows/build.ps1 -Version 1.0.0
 param(
     [string]$Version = "dev",
@@ -41,12 +42,15 @@ python -m pip install --disable-pip-version-check --no-compile --only-binary=:al
 # pip adds command-line launchers (f2py.exe, numpy-config.exe) there: unsigned exes the game never uses.
 Remove-Item -Recurse -Force (Join-Path $site "bin") -ErrorAction SilentlyContinue
 
+Write-Host "== unicode3d"
+# The engine, at the version requirements.txt pins. Its wheel carries its license files (LGPL).
+$engine = Get-Content "requirements.txt" | Where-Object { $_ -match "^unicode3d" }
+python -m pip install --disable-pip-version-check --no-compile --no-deps --target $site $engine
+
 Write-Host "== game"
 $code = Join-Path $app "app"
 New-Item -ItemType Directory -Force $code | Out-Null
-foreach ($pkg in "zombie", "unicode3d") {
-    Copy-Item -Recurse $pkg (Join-Path $code $pkg)
-}
+Copy-Item -Recurse "zombie" (Join-Path $code "zombie")
 Get-ChildItem $code -Recurse -Directory -Filter "__pycache__" | Remove-Item -Recurse -Force
 Copy-Item "packaging/windows/zombiedice_launch.py" $code
 "import zombiedice_launch" | Set-Content -Encoding ascii (Join-Path $site "zombiedice.pth")

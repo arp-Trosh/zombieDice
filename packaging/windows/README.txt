@@ -42,3 +42,10 @@ SHARPER GRAPHICS
   set it for every game by running
       set ZOMBIEDICE_NAME=YourName
   before ZombieDice.exe the same way.
+
+LICENSES
+  The 3D graphics are drawn by unicode3d (https://github.com/arp-Trosh/unicode3d), which is free
+  software under the GNU Lesser General Public License, version 3 or later. Its source and license
+  texts (COPYING, COPYING.LESSER) are in Lib\site-packages\unicode3d and
+  Lib\site-packages\unicode3d-*.dist-info\licenses; you may replace it with your own version.
+  Python (python.org) and numpy (numpy.org) come with their own licenses, in the same places.
