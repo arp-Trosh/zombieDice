@@ -192,3 +192,7 @@ through ConPTY (the console layer Windows Terminal uses) before publishing. The 
 Zombie Dice is not licensed for reuse: all rights reserved. The unicode3d engine it uses is free
 software under the GNU LGPL 3.0 or later (see its repository); the Windows release includes its
 license texts.
+
+---
+
+*Disclaimer: This project was created with Claude Code.*
