@@ -161,7 +161,7 @@ tag such as `v0.1.0`); the game uses `unicode3d`'s public modules and builds its
 
 ### Working on the engine and the game together
 
-Keep both checkouts side by side (`~/Documents/Claude/unicode3d` and `~/Documents/Claude/zombieDice`)
+Keep both checkouts side by side in the same folder (`unicode3d/` and `zombieDice/`)
 and install the engine in editable mode, so the game runs your working copy of it:
 
 ```sh
