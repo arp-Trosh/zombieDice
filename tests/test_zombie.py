@@ -344,28 +344,104 @@ class GraphicsTests(unittest.TestCase):
         self.assertTrue(all((a > 0).any() for a in screen.frames))
 
 
+    def test_tray_cup_dice_and_descriptions(self):
+        from unicode3d.terminal import Screen
+        from zombie.graphics import DiceTray
+        tray, screen = DiceTray(np.random.default_rng(2)), Screen(glyphs="quad", color="truecolor", size=(30, 90))
+        tray.set_cup({GREEN: 4, YELLOW: 2, RED: 1})
+        self.assertEqual(len(tray.cup_dice), 7)
+        tray.roll([(GREEN, BRAIN), (YELLOW, FEET), (RED, SHOTGUN)])
+        tray.update(10.0)
+        tray.render(screen, 0, 0, 80, 24)
+        text = "\n".join("".join(row) for row in screen.chars)
+        for label in ("BRAIN", "RAN", "BLAM!"):  # the roll in words, under the dice
+            self.assertIn(label, text)
+        found = set()
+        for y in range(24):
+            for x in range(80):
+                hit = tray.describe(y, x)
+                if hit:
+                    found.add(hit[1].split(":")[0] if hit[0] == "die" else hit[0])
+        self.assertEqual(found, {"Green die", "Yellow die", "Red die", "cup"})
+        tray.bust()
+        tray.celebrate(True)
+        tray.update(0.5)
+        tray.render(screen, 0, 0, 80, 24, top_rows=6)
+        self.assertEqual(tray.dice, [])
+        self.assertTrue(tray.trophy.visible)
+
+    def test_graveyard_lives_and_dies(self):
+        from unicode3d.terminal import Screen
+        from zombie.horde import Graveyard
+        yard, screen = Graveyard(seed=4), Screen(glyphs="quad", color="truecolor", size=(30, 100))
+        kinds = set()
+        for i in range(900):  # half a minute
+            yard.update(1 / 30)
+            kinds.update((a.kind, a.state) for a in yard.actors)
+            zombies = sum(a.kind == "zombie" for a in yard.actors)
+            self.assertLessEqual(zombies, yard.MAX_ZOMBIES + 1)
+        for want in (("zombie", "shamble"), ("zombie", "eat"), ("human", "run"), ("human", "down")):
+            self.assertIn(want, kinds)
+        yard.render(screen, 0, 0, 100, 29, 10)
+        # A click on a zombie shotguns it: it is gone, in flying pieces.
+        target = next(a for a in yard.actors if a.kind == "zombie" and a.state == "shamble")
+        x, y = yard.renderer.project(target.figure.torso.to_world((0.0, 0.35, 0.0)))
+        before = len(yard.gibs)
+        self.assertTrue(yard.click(int(x), int(y)))
+        self.assertNotIn(target, yard.actors)
+        self.assertGreater(len(yard.gibs), before)
+        for i in range(120):
+            yard.update(1 / 30)
+        self.assertEqual(yard.gibs, [])  # the pieces fade away
+
+    def test_brains_come_out_of_the_head(self):
+        from zombie.horde import Graveyard
+        yard = Graveyard(seed=4)
+        checked = 0
+        for i in range(1800):
+            yard.update(1 / 30)
+            for victim, brain in yard.brains.items():
+                head = victim.figure.head.to_world((0.0, 0.0, 0.0))
+                self.assertLess(np.linalg.norm(brain.position - head), 0.5)
+                checked += 1
+        self.assertGreater(checked, 0)
+
+    def test_lobby_table_seats_everyone(self):
+        from unicode3d.terminal import Screen
+        from zombie.horde import LobbyTable
+        from zombie.ui import name_color
+        table, screen = LobbyTable(), Screen(glyphs="quad", color="truecolor", size=(30, 100))
+        table.seat([{"name": "Alice", "bot": False}, {"name": "Rotbeard", "bot": True}], 4, name_color)
+        self.assertEqual(len(table.seats), 4)
+        self.assertEqual([s[3] for s in table.seats], ["Alice", "Rotbeard", None, None])  # two ghosts
+        table.update(0.5)
+        table.render(screen, 0, 0, 90, 24)
+        self.assertIn("Alice", "\n".join("".join(row) for row in screen.chars))
+
+
 class DisplaySettingsTests(unittest.TestCase):
     def app_frame(self, app, screen, keys=()):
         app.frame(screen, 1 / 30, list(keys))
         return "".join(screen.chars[-1])
 
-    def test_cycle(self):
-        from zombie.ui import FPS_STEPS, cycle
-        self.assertEqual(cycle(FPS_STEPS, 30), 60)
-        self.assertEqual(cycle(FPS_STEPS, 144), 30)
-        self.assertEqual(cycle(FPS_STEPS, 45), 60)   # not listed: the next one up
-        self.assertEqual(cycle(FPS_STEPS, 200), 30)
-
     def test_function_keys_cycle_the_display(self):
         from unicode3d.keys import Key
         from unicode3d.terminal import Screen
+        from zombie.graphics import GRAPHICS
         from zombie.ui import App
         app, screen = App("Tester"), Screen(glyphs="quad", color="truecolor", size=(30, 100))
-        self.assertTrue(self.app_frame(app, screen).endswith("F2 quad     F3 truecolor  F4 --/30fps   "))
+        self.assertTrue(self.app_frame(app, screen).endswith(
+            "F2 quad     F3 truecolor  F4 --/30fps    F5 shadows     F6 reflections    "))
         self.app_frame(app, screen, [Key.F2, Key.F3, Key.F4])
         self.assertEqual((screen.mode, screen.color_mode, screen.fps), ("sextant", "256", 60))
         screen.measured_fps = 41.0
-        self.assertTrue(self.app_frame(app, screen).endswith("F2 sextant  F3 256        F4 41/60fps   "))
+        try:
+            row = self.app_frame(app, screen, [Key.F5, Key.F6])
+            self.assertTrue(row.endswith("F2 sextant  F3 256        F4 41/60fps    F5 no shadows  F6 no reflections "))
+            # F5 and F6 reach every renderer in the game, the menu's graveyard included.
+            self.assertFalse(app.backdrop.renderer.shadows or app.backdrop.renderer.reflections)
+        finally:
+            GRAPHICS.shadows = GRAPHICS.reflections = True
 
     def test_game_buttons_fit_narrow_terminals(self):
         from unicode3d.terminal import Screen
@@ -378,6 +454,38 @@ class DisplaySettingsTests(unittest.TestCase):
             app.frame(screen, 1 / 30, [])
             self.assertTrue(any(row in "".join(line) for line in screen.chars), cols)
             app.close()
+
+    def test_dice_kept_panel_scrolls(self):
+        from unicode3d.keys import Key, MouseEvent
+        from unicode3d.terminal import Screen
+        from zombie.ui import App, GameView
+        app = App("Me")
+        view = app.view = GameView(app, single_player_session("Me", rng=random.Random(3), delays=(0, 0)))
+        screen = Screen(glyphs="quad", color="truecolor", size=(24, 80))
+        while view.shown is None:
+            app.frame(screen, 1 / 30, [])
+        view.session.states.clear()
+        view.tick = lambda dt: None  # hold this state still
+        turn = dict(view.shown["turn"], shotguns=[RED, RED], brains=[GREEN, GREEN, YELLOW], feet=[GREEN, RED],
+                    recycled=0)
+        view.shown = dict(view.shown, turn=turn)
+
+        def scroller():
+            app.frame(screen, 1 / 30, [])
+            return "".join(screen.chars[view.kept_area[2] - 2, 1:13])
+
+        self.assertEqual(scroller(), "^ 1-1 of 7 v")  # one token fits at 80x24; seven are kept
+        app.frame(screen, 1 / 30, [Key.DOWN, Key.DOWN])
+        self.assertEqual(scroller(), "^ 3-3 of 7 v")
+        for _ in range(10):
+            app.frame(screen, 1 / 30, [Key.PAGE_DOWN])
+        self.assertEqual(scroller(), "^ 7-7 of 7 v")  # stops at the last one
+        y = view.kept_area[2] - 2
+        app.frame(screen, 1 / 30, [MouseEvent(1, y, MouseEvent.LEFT, True, False)])  # click the ^
+        self.assertEqual(scroller(), "^ 6-6 of 7 v")
+        app.frame(screen, 1 / 30, [MouseEvent(5, 5, MouseEvent.WHEEL_UP, True, False)])
+        self.assertEqual(scroller(), "^ 5-5 of 7 v")
+        app.close()
 
     def test_status_line_stays_put(self):
         from unicode3d.keys import Key
@@ -393,10 +501,20 @@ class DisplaySettingsTests(unittest.TestCase):
                     screen.set_color(color)
                     screen.measured_fps = measured
                     row = self.app_frame(app, screen)
-                    starts.add(tuple(row.index(k) for k in ("F2", "F3", "F4")))
+                    starts.add(tuple(row.index(k) for k in ("F2", "F3", "F4", "F5", "F6")))
         self.assertEqual(len(starts), 1)
         # The menu's own bottom line moves up a row rather than being covered.
         self.assertIn("Up/Down + Enter, or click", "".join(screen.chars[-2]))
+
+    def test_graphics_settings_reach_new_renderers(self):
+        from unicode3d.scene import Renderer
+        from zombie.graphics import GraphicsSettings
+        settings = GraphicsSettings()
+        old = settings.track(Renderer(1, 1))
+        settings.shadows = False
+        new = settings.track(Renderer(1, 1))
+        self.assertFalse(old.shadows or new.shadows)
+        self.assertTrue(old.reflections and new.reflections)
 
 import numpy as np  # noqa: E402
 

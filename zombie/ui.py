@@ -1,8 +1,10 @@
 """Screens: main menu, multiplayer setup, lobby and the game table."""
-from unicode3d.color import COLOR_MODES, Color
+from unicode3d.color import Color
 from unicode3d.keys import Key, MouseEvent
+from unicode3d.ui import DisplayControls
 
-from .graphics import DIE_COLOR, DiceTray, KeptDice
+from .graphics import DIE_COLOR, GRAPHICS, DiceTray, KeptDice
+from .horde import Graveyard, LobbyTable
 from .net import DEFAULT_PORT, local_ip
 from .rules import BRAIN, FACES, FEET, GREEN, MAX_SHOTGUNS, RED, SHOTGUN, WINNING_SCORE, YELLOW
 from .session import MAX_NAME, MAX_PLAYERS, ClientSession, host_session, single_player_session
@@ -15,9 +17,7 @@ NAME_COLORS = (Color.CYAN, Color.MAGENTA, Color.YELLOW, Color.GREEN, Color.BLUE,
 FACE_WORD = {BRAIN: "brain", SHOTGUN: "shotgun", FEET: "footsteps"}
 FACE_CHAR = {BRAIN: "B", SHOTGUN: "X", FEET: "F"}
 FPS_STEPS = (30, 60, 120, 144)
-# Status line fields: the longest glyph set, colour mode and "achieved/target" frame rate.
-STATUS_WIDTHS = (len("sextant"), len("truecolor"), len("144/144fps"))
-STATUS_WIDTH = sum(3 + w for w in STATUS_WIDTHS) + 2 * (len(STATUS_WIDTHS) - 1)  # "F2 " before each, 2 between
+TOOLTIP_SECONDS = 5.0
 
 
 class ViewArea:
@@ -37,6 +37,13 @@ class ViewArea:
 class Click:
     def __init__(self, y, x):
         self.y, self.x = y, x
+
+
+class Wheel:
+    """A turn of the mouse wheel at (y, x): step -1 up, +1 down."""
+
+    def __init__(self, y, x, step):
+        self.y, self.x, self.step = y, x, step
 
 
 def name_color(name):
@@ -121,13 +128,6 @@ class Toggle:
         view.hits.append((y, x, x + 7, self.flip))
 
 
-def cycle(options, current):
-    """The option after `current`, wrapping round; for a number not listed, the next one up."""
-    if current in options:
-        return options[(options.index(current) + 1) % len(options)]
-    return next((o for o in options if o > current), options[0])
-
-
 def button_row_width(buttons):
     """Columns View.button_row takes for these buttons: "[ label ]" each, one space between."""
     return sum(len(label) + 4 for label, _, _ in buttons) + len(buttons) - 1
@@ -143,6 +143,13 @@ def draw_box(screen, top, left, height, width, title=None, color=Color.DEFAULT):
     screen.text(top + height - 1, left, "+" + "-" * (width - 2) + "+", color)
     if title:
         screen.text(top, left + 2, f" {title} ", color, bold=True)
+
+
+def draw_panel(screen, top, left, height, width, title=None, color=Color.DEFAULT):
+    """A box with its inside blanked, so text in it reads cleanly over a rendered scene."""
+    for y in range(top, top + height):
+        screen.text(y, left, " " * width)
+    draw_box(screen, top, left, height, width, title, color)
 
 
 def draw_segments(screen, y, x, segments, max_width=None):
@@ -190,6 +197,10 @@ class View:
                     if k.y == y and x0 <= k.x < x1:
                         action()
                         break
+                else:
+                    self.click(k)
+            elif isinstance(k, Wheel):
+                self.wheel(k)
             else:
                 self.key(k)
             if self.app.view is not self:
@@ -200,6 +211,12 @@ class View:
 
     def key(self, k):
         pass
+
+    def click(self, k):
+        """A click that hit no button: on the 3D scenery, perhaps."""
+
+    def wheel(self, k):
+        """A turn of the mouse wheel."""
 
     def draw(self, screen, dt):
         pass
@@ -221,7 +238,23 @@ class View:
 
 # ----- menus -----------------------------------------------------------------------
 
-class MenuView(View):
+class GraveyardView(View):
+    """A menu page over the graveyard: zombies roam behind it, and clicking one shotguns it."""
+
+    def tick(self, dt):
+        self.app.backdrop.update(dt)
+
+    def click(self, k):
+        self.app.backdrop.click(k.x, k.y)
+
+    def draw_backdrop(self, screen, title_rows):
+        """The graveyard over the whole page, the logo in the sky above the page's first `title_rows` rows,
+        leaving the rest of them to the zombies."""
+        rows, cols = screen.size()
+        self.app.backdrop.render(screen, 0, 0, cols, rows, max(int(title_rows * 0.7), 5))
+
+
+class MenuView(GraveyardView):
     ITEMS = ("Single Player", "Multiplayer", "Quit")
 
     def __init__(self, app):
@@ -249,9 +282,9 @@ class MenuView(View):
 
     def draw(self, screen, dt):
         rows, cols = screen.size()
-        self.app.logo.update(dt)
         title_h = max(10, int(rows * 0.62))
-        self.app.logo.render(screen, 0, 0, cols, title_h)
+        self.draw_backdrop(screen, title_h)
+        draw_panel(screen, title_h, (cols - 29) // 2, 2 * len(self.ITEMS) + 1, 29, None, Color.GREEN)
         y = title_h + 1
         for i, item in enumerate(self.ITEMS):
             label = f"{item:^17}"
@@ -262,11 +295,11 @@ class MenuView(View):
         if self.app.flash:
             msg = self.app.flash[:cols - 2]
             screen.text(rows - 2, (cols - len(msg)) // 2, msg, Color.YELLOW, bold=True)
-        hint = "Up/Down + Enter, or click"
-        screen.text(rows - 1, (cols - len(hint)) // 2, hint, dim=True)
+        hint = "Up/Down + Enter, or click  -  click a zombie to shoot it"
+        screen.text(rows - 1, max((cols - len(hint)) // 2, 0), hint[:cols], dim=True)
 
 
-class SinglePlayerView(View):
+class SinglePlayerView(GraveyardView):
     """Pick how many zombies sit at the table before a single player game."""
 
     def __init__(self, app):
@@ -300,10 +333,10 @@ class SinglePlayerView(View):
 
     def draw(self, screen, dt):
         rows, cols = screen.size()
-        self.app.logo.update(dt)
         title_h = max(8, int(rows * 0.5))
-        self.app.logo.render(screen, 0, 0, cols, title_h)
+        self.draw_backdrop(screen, title_h)
         left = (cols - 40) // 2
+        draw_panel(screen, title_h, left - 3, 9, 46, None, Color.GREEN)
         y = title_h + 1
         screen.text(y, left, "SINGLE PLAYER", Color.GREEN, bold=True)
         y += 2
@@ -323,7 +356,7 @@ class SinglePlayerView(View):
         screen.text(rows - 1, max((cols - len(hint)) // 2, 0), hint[:cols], dim=True)
 
 
-class MultiplayerView(View):
+class MultiplayerView(GraveyardView):
     def __init__(self, app):
         super().__init__(app)
         digits = "0123456789"
@@ -424,11 +457,12 @@ class MultiplayerView(View):
 
     def draw(self, screen, dt):
         rows, cols = screen.size()
-        self.app.logo.update(dt)
-        title_h = max(8, int(rows * 0.4))
-        self.app.logo.render(screen, 0, 0, cols, title_h)
+        panel_h = len(self.items) + 7  # title, gaps, the items and a line for errors
+        title_h = max(5, min(int(rows * 0.4), rows - 1 - panel_h))
+        self.draw_backdrop(screen, title_h)
         width = 50
         left = (cols - width) // 2
+        draw_panel(screen, title_h, left - 3, panel_h, width + 6, None, Color.YELLOW)
         y = title_h + 1
         screen.text(y, left, "MULTIPLAYER", Color.YELLOW, bold=True)
         y += 2
@@ -526,11 +560,13 @@ class LobbyView(SessionView):
         super().__init__(app, session)
         self.state = None
         self.address = f"{local_ip()}:{session.port}" if session.is_host else session.address
+        self.table = LobbyTable()
 
     def tick(self, dt):
         super().tick(dt)
         if self.app.view is not self:
             return
+        self.table.update(dt)
         while self.session.states:
             s = self.session.states.popleft()
             if s.get("phase") != "lobby":
@@ -622,6 +658,9 @@ class LobbyView(SessionView):
             tips = [(seats_note, Color.CYAN), ("Keys: S start  -/+ players", None), ("      B bots  T talk  Q leave", None)]
         for i, (tip, color) in enumerate(tips):
             screen.text(3 + i, 49, tip[:cols - 50], color or Color.DEFAULT, dim=color is None)
+        # The table in 3D, with everyone seated: the same players as the list, open seats as ghosts.
+        self.table.seat(players, seats, name_color)
+        self.table.render(screen, 4 + len(tips), 48, cols - 49, chat_top - 6 - len(tips))
 
         buttons = self.buttons()
         self.focus = min(self.focus, len(buttons) - 1)
@@ -645,6 +684,10 @@ class GameView(SessionView):
         self.last_event_id = None
         self.game_id = None
         self.confirm_leave = False
+        self.tooltip = ("", 0.0)  # (text, seconds left): what a click on the tray found
+        self.kept_scroll = 0      # rows of tokens scrolled past in the Dice Kept panel
+        self.kept_area = (0, 0, 0, 0)  # top, left, height, width as last drawn
+        self.tray_area = (0, 0, 0, 0)  # top, left, height, width as last drawn
 
     # ----- state flow --------------------------------------------------------------
 
@@ -654,6 +697,7 @@ class GameView(SessionView):
             return
         self.tray.update(dt * self.session.speed)
         self.kept.update(dt)
+        self.tooltip = (self.tooltip[0], self.tooltip[1] - dt)
         if self.anim_state is not None and not self.tray.animating:
             s, self.anim_state = self.anim_state, None
             self.landed(s)
@@ -668,6 +712,7 @@ class GameView(SessionView):
             return
         if s["game_id"] != self.game_id:
             self.game_id = s["game_id"]
+            self.tray.celebrate(False)
             self.tray.clear()
             self.shown = None
             self.session.log(f"A new game begins! First to {WINNING_SCORE} brains triggers the final round.", Color.GREEN)
@@ -680,6 +725,7 @@ class GameView(SessionView):
                 return
             if ev["kind"] == "stop":
                 n = ev["brains"]
+                self.tray.bank()
                 self.session.log(f"{self.player_name(s, ev['player'])} stops and eats {n} brain{'s' * (n != 1)} "
                                  f"(total {ev['score']}).", Color.GREEN)
         self.show(s)
@@ -693,6 +739,7 @@ class GameView(SessionView):
             lost = ev["brains"]
             dropped = f"drops {lost} brain{'s' * (lost != 1)}" if lost else "the turn is over"
             self.session.log(f"BLAM! {name} took {ev['shotguns']} shotgun blasts - {dropped}.", Color.RED)
+            self.tray.bust()
         self.show(s)
 
     def show(self, s):
@@ -704,12 +751,14 @@ class GameView(SessionView):
                 who = names[0] if len(names) == 1 else " and ".join(names)
                 verb = "wins" if len(names) == 1 else "tie"
                 self.session.log(f"GAME OVER - {who} {verb} with {score} brains!", Color.YELLOW)
+            self.tray.celebrate(True)
             return
         if s.get("final_round") and not (prev and prev.get("final_round")):
             t = s["triggered_by"]
             self.session.log(f"{self.player_name(s, t)} reached {s['players'][t]['score']} brains! "
                              "FINAL ROUND - everyone else gets one last turn.", Color.YELLOW)
         if prev is None or prev.get("current") != s.get("current"):
+            self.kept_scroll = 0
             p = s["players"][s["current"]]
             if p["id"] == self.session.my_id:
                 self.session.log("Your turn! Press R to roll.", Color.CYAN)
@@ -802,6 +851,18 @@ class GameView(SessionView):
             self.confirm_leave = False
         elif k in (ord("t"), ord("T"), TAB):
             self.start_chat()
+        elif k in (Key.UP, Key.PAGE_UP):
+            self.scroll_kept(-1)
+        elif k in (Key.DOWN, Key.PAGE_DOWN):
+            self.scroll_kept(1)
+
+    def scroll_kept(self, rows):
+        self.kept_scroll = max(self.kept_scroll + rows, 0)  # the panel clamps it to what there is when drawn
+
+    def wheel(self, k):
+        top, left, height, width = self.kept_area
+        if top <= k.y < top + height and left <= k.x < left + width:
+            self.scroll_kept(k.step)
 
     # ----- drawing -----------------------------------------------------------------
 
@@ -814,9 +875,15 @@ class GameView(SessionView):
         tray_h = chat_top - self.CTRL_H
 
         kept_w = 26 if cols >= 120 else 14
+        self.kept_area = (0, 0, tray_h, kept_w)
         self.draw_kept(screen, 0, 0, tray_h, kept_w)
-        self.tray.render(screen, 0, kept_w, main_w - 1 - kept_w, tray_h)
-        self.draw_tray_overlay(screen, kept_w, main_w - 1 - kept_w, tray_h)
+        tray_w = main_w - 1 - kept_w
+        self.tray_area = (0, kept_w, tray_h, tray_w)
+        # The glass cup shows what is left in the cup (after the roll that is landing, if one is).
+        s = self.anim_state or self.shown
+        self.tray.set_cup(s["turn"]["cup"] if s is not None and s["phase"] == "playing" else None)
+        self.tray.render(screen, 0, kept_w, tray_w, tray_h, top_rows=self.overlay_rows())
+        self.draw_tray_overlay(screen, kept_w, tray_w, tray_h)
         screen.text(tray_h, 0, "-" * (main_w - 1))
         self.draw_status(screen, tray_h + 1, main_w - 2)
         buttons = self.buttons()
@@ -855,40 +922,88 @@ class GameView(SessionView):
             screen.text(y + 1, left + 1 + max((inner_w - len(msg)) // 2, 0), msg[:inner_w], dim=True)
             return
         area_h = top + height - 1 - y
-        if len(dice) > self.kept.capacity(inner_w, area_h):
-            area_h -= 1  # leave a row for the overflow note
-        drawn = self.kept.render(screen, y, left + 1, inner_w, area_h, dice)
-        if drawn < len(dice):
-            screen.text(top + height - 2, left + 1, f"+{len(dice) - drawn} more"[:inner_w], Color.WHITE, bold=True)
+        cols = self.kept.columns(inner_w)
+        overflow = len(dice) > self.kept.capacity(inner_w, area_h)
+        if overflow:
+            area_h -= 1  # the bottom row scrolls
+        visible = max(area_h // self.kept.CELL_H, 0)
+        total = -(-len(dice) // cols)
+        self.kept_scroll = min(self.kept_scroll, max(total - visible, 0))
+        start = self.kept_scroll * cols
+        drawn = self.kept.render(screen, y, left + 1, inner_w, area_h, dice, start)
+        if overflow:
+            self.draw_kept_scroller(screen, top + height - 2, left + 1, inner_w, start, drawn, len(dice),
+                                    self.kept_scroll > 0, self.kept_scroll < total - visible)
+
+    def draw_kept_scroller(self, screen, y, x, width, start, drawn, total, up, down):
+        """The Dice Kept panel's scroll row: "^ 3-4 of 7 v", the arrows clickable (Up/Down keys and the wheel
+        scroll too). Always the full width of the panel, so nothing in it moves as it scrolls."""
+        shown = f"{start + 1}-{start + drawn}" if drawn else "-"
+        middle = f"{shown} of {total}" if width >= 12 else f"{shown}/{total}"
+        screen.text(y, x, f"{middle:^{width}}"[:width], Color.WHITE, bold=True)
+        screen.text(y, x, "^", Color.YELLOW if up else Color.DEFAULT, bold=up, dim=not up)
+        screen.text(y, x + width - 1, "v", Color.YELLOW if down else Color.DEFAULT, bold=down, dim=not down)
+        self.hits.append((y, x, x + 2, lambda: self.scroll_kept(-1)))
+        self.hits.append((y, x + width - 2, x + width, lambda: self.scroll_kept(1)))
+
+    def game_over_lines(self):
+        s = self.shown
+        names = [self.player_name(s, i) for i in s["winners"]]
+        score = s["players"][s["winners"][0]]["score"]
+        lines = ["G A M E   O V E R", "",
+                 (f"{names[0]} wins with {score} brains!" if len(names) == 1
+                  else f"Tie at {score} brains: {', '.join(names)}")]
+        if any(s["players"][i]["id"] == self.session.my_id for i in s["winners"]):
+            lines.append("You are the ultimate zombie!")
+        return lines
+
+    def overlay_rows(self):
+        """Rows at the top of the tray that its text takes: the banner, or the GAME OVER box."""
+        if self.shown is not None and self.shown["phase"] == "over":
+            return len(self.game_over_lines()) + 2
+        return 1  # the banner (what a click on the tray found goes on the row below, over the scene)
 
     def draw_tray_overlay(self, screen, x0, width, height):
         s = self.shown
         if s is None:
             return
         if s["phase"] == "over":
-            names = [self.player_name(s, i) for i in s["winners"]]
-            score = s["players"][s["winners"][0]]["score"]
-            lines = ["G A M E   O V E R", "",
-                     (f"{names[0]} wins with {score} brains!" if len(names) == 1
-                      else f"Tie at {score} brains: {', '.join(names)}")]
-            if any(s["players"][i]["id"] == self.session.my_id for i in s["winners"]):
-                lines.append("You are the ultimate zombie!")
+            # The winner in words at the top; the trophy stands below it.
+            lines = self.game_over_lines()
             box_w = min(max(len(line) for line in lines) + 6, width - 2)
-            top, left = max(height // 2 - 3, 0), x0 + max((width - box_w) // 2, 0)
-            for i in range(len(lines) + 2):
-                screen.text(top + i, left, " " * box_w)
-            draw_box(screen, top, left, len(lines) + 2, box_w, None, Color.YELLOW)
+            left = x0 + max((width - box_w) // 2, 0)
+            draw_panel(screen, 0, left, len(lines) + 2, box_w, None, Color.YELLOW)
             for i, line in enumerate(lines):
-                screen.text(top + 1 + i, left + (box_w - len(line)) // 2, line[:box_w - 2], Color.YELLOW, bold=True)
+                screen.text(1 + i, left + (box_w - len(line)) // 2, line[:box_w - 2], Color.YELLOW, bold=True)
             return
         p = s["players"][s["current"]]
         banner = "~ YOUR TURN ~" if p["id"] == self.session.my_id else f"~ {p['name']}'s turn ~"
         if s.get("final_round"):
             banner += "   FINAL ROUND"
         screen.text(0, x0 + (width - len(banner)) // 2, banner[:width], name_color(p["name"]), bold=True)
+        text, left = self.tooltip
+        if left > 0 and text:
+            text = text[:width - 2]
+            screen.text(1, x0 + max((width - len(text)) // 2, 1), text, Color.WHITE)
         if not self.tray.dice and s["turn"]["rolls"] == 0:
-            hint = "Press R to roll!" if self.my_turn else "Shaking the cup..."
+            hint = "Press R (or click the cup) to roll!" if self.my_turn else "Shaking the cup..."
+            if len(hint) > width - 2:
+                hint = "Press R to roll!" if self.my_turn else hint
             screen.text(height // 2, x0 + (width - len(hint)) // 2, hint, dim=not self.my_turn)
+
+    def click(self, k):
+        """A click in the tray: the cup rolls the dice on your turn; anything else there is described."""
+        top, left, height, width = self.tray_area
+        if not (top <= k.y < top + height and left <= k.x < left + width):
+            return
+        found = self.tray.describe(k.y, k.x)
+        if found is None:
+            return
+        what, text = found
+        if what == "cup" and self.my_turn:
+            self.roll()
+            return
+        self.tooltip = (text, TOOLTIP_SECONDS)
 
     def draw_status(self, screen, y, width):
         s = self.shown
@@ -953,7 +1068,6 @@ class GameView(SessionView):
 
 class App:
     def __init__(self, name):
-        from .graphics import TitleLogo
         self.name = name
         self.host_port = DEFAULT_PORT
         self.join_port = DEFAULT_PORT
@@ -961,19 +1075,16 @@ class App:
         self.sp_players = 6  # you + 5 bots
         self.mp_players = 4
         self.mp_bots = True
-        self.logo = TitleLogo()
+        self.backdrop = Graveyard()
+        # The status line: glyphs F2, colours F3, frame rate F4, shadows F5, reflections F6, for every 3D view.
+        self.controls = DisplayControls(FPS_STEPS, renderer=GRAPHICS)
         self.flash = ""
         self.running = True
         self.view = MenuView(self)
 
     def frame(self, screen, dt, keys):
-        display = {Key.F2: self.cycle_glyphs, Key.F3: self.cycle_color, Key.F4: self.cycle_fps}
-        view_keys = []
-        for k in self.translate_mouse(keys):
-            if isinstance(k, int) and k in display:
-                display[k](screen)
-            else:
-                view_keys.append(k)
+        # Function keys and clicks on the status line can't clash with typing a name or a chat line.
+        view_keys = self.translate_mouse(self.controls.handle(keys, screen))
         self.view.tick(dt)
         rows, cols = screen.size()
         if rows < MIN_ROWS or cols < MIN_COLS:
@@ -985,37 +1096,14 @@ class App:
         screen.refresh()
         return self.running
 
-    # F2/F3/F4 work on every screen, since function keys can't clash with typing a name or a chat line.
-    @staticmethod
-    def cycle_glyphs(screen):
-        screen.set_glyphs(cycle(screen.glyph_modes, screen.mode))
-
-    @staticmethod
-    def cycle_color(screen):
-        screen.set_color(cycle(COLOR_MODES, screen.color_mode))
-
-    @staticmethod
-    def cycle_fps(screen):
-        screen.fps = cycle(FPS_STEPS, screen.fps)
-
     def draw_status_line(self, screen):
-        """The bottom row: glyphs, colours and frame rate (achieved/target), each clickable to change it.
+        """The bottom row: the display settings, each clickable to change it.
 
         Every field is as wide as its longest value, so nothing moves as the values change.
         """
         rows, cols = screen.size()
-        measured = "--" if screen.measured_fps is None else f"{min(screen.measured_fps, 999):.0f}"
-        fields = (("F2", screen.mode, STATUS_WIDTHS[0], self.cycle_glyphs),
-                  ("F3", screen.color_mode, STATUS_WIDTHS[1], self.cycle_color),
-                  ("F4", f"{measured}/{screen.fps}fps", STATUS_WIDTHS[2], self.cycle_fps))
-        x = max(cols - STATUS_WIDTH - 1, 0)
-        y = rows - 1
-        screen.text(y, 0, " " * cols)
-        for key, value, width, action in fields:
-            screen.text(y, x, key, dim=True)
-            screen.text(y, x + 3, f"{value:<{width}}", dim=True)
-            self.view.hits.append((y, x, x + 3 + width, lambda action=action: action(screen)))
-            x += 3 + width + 2
+        screen.text(rows - 1, 0, " " * cols)
+        self.controls.draw(screen, rows - 1, max(cols - self.controls.width - 1, 1))
 
     @staticmethod
     def translate_mouse(keys):
@@ -1024,6 +1112,8 @@ class App:
             if isinstance(k, MouseEvent):
                 if k.button == MouseEvent.LEFT and k.pressed:
                     out.append(Click(k.y, k.x))
+                elif k.button in (MouseEvent.WHEEL_UP, MouseEvent.WHEEL_DOWN):
+                    out.append(Wheel(k.y, k.x, -1 if k.button == MouseEvent.WHEEL_UP else 1))
             else:
                 out.append(k)
         return out

@@ -44,7 +44,8 @@ def selftest():
     import unicode3d
     from unicode3d.console import WindowsConsole
     from unicode3d.terminal import Screen
-    from zombie.graphics import DiceTray, KeptDice, TitleLogo
+    from zombie.graphics import DiceTray, KeptDice
+    from zombie.horde import Graveyard, LobbyTable
     from zombie.rules import BRAIN, FEET, GREEN, RED, SHOTGUN, YELLOW
 
     print(f"Python {sys.version.split()[0]} at {sys.executable}; numpy {np.__version__}, numba {numba.__version__}, "
@@ -67,13 +68,16 @@ def selftest():
     for glyphs in ("half", "quad", "sextant", "ascii"):
         for color in ("truecolor", "256", "16"):
             screen = Screen(glyphs=glyphs, color=color, size=(40, 120))
-            logo, tray, kept = TitleLogo(), DiceTray(np.random.default_rng(1)), KeptDice()
-            logo.update(2.0)
-            logo.render(screen, 0, 0, 100, 18)
+            yard, tray, kept, table = Graveyard(seed=1), DiceTray(np.random.default_rng(1)), KeptDice(), LobbyTable()
+            yard.update(2.0)
+            yard.render(screen, 0, 0, 100, 18, 8)
+            tray.set_cup({GREEN: 3, YELLOW: 2, RED: 2})
             tray.roll(dice)
             tray.update(10.0)
             tray.render(screen, 18, 12, 70, 16)
             kept.render(screen, 18, 0, 12, 21, dice)
+            table.seat([{"name": "Smoke", "bot": False}], 3, lambda name: 0)
+            table.render(screen, 34, 12, 70, 6)
             drawn = int((screen.chars != " ").sum())
             out = screen.render_updates()
             assert drawn > 500 and len(out) > 1000, (glyphs, color, drawn, len(out))
