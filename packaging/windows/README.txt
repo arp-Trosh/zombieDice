@@ -20,7 +20,10 @@ STARTING
 PLAYING
   R roll, S stop and bank your brains, T or Tab chat, Q leave (press twice).
   F switches the bots' speed in single player; P plays again once a game is over (host).
-  Left/Right arrows + Enter, or the mouse, work the buttons. Rules are in the game's README:
+  Left/Right arrows + Enter, or the mouse, work the buttons. Click the glass cup to roll, or a
+  die to have it described. Up/Down (or the mouse wheel) scrolls the Dice Kept panel when it is
+  full. Everything the 3D shows is also written as text on screen and in the chat.
+  On the main menu, click a zombie to shotgun it. Rules are in the game's README:
   https://github.com/arp-Trosh/zombieDice
 
 MULTIPLAYER
@@ -32,8 +35,9 @@ MULTIPLAYER
   on networks: allow it on Private networks. Joining a game and single player never ask.
 
 SHARPER GRAPHICS
-  F2, F3 and F4 cycle the graphics, colours and frame rate while you play; the bottom line
-  always shows the current settings and the frame rate achieved.
+  F2, F3 and F4 cycle the graphics, colours and frame rate while you play; F5 and F6 switch
+  shadows and reflections off and on (off is faster on a slow PC). The bottom line always shows
+  the current settings and the frame rate achieved.
   In Windows Terminal the game uses its finest graphics automatically. In the classic console it
   uses a coarser set that works with any font; if your console font is Cascadia, you can ask for
   the finer one: open a Command Prompt in the ZombieDice folder and run
