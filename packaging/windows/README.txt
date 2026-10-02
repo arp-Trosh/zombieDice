@@ -55,6 +55,7 @@ LICENSES
   software under the GNU Lesser General Public License, version 3 or later. Its source and license
   texts (COPYING, COPYING.LESSER) are in Lib\site-packages\unicode3d and
   Lib\site-packages\unicode3d-*.dist-info\licenses; you may replace it with your own version.
-  Python (python.org), numpy (numpy.org), Numba (numba.pydata.org) and llvmlite come with their
-  own licenses, in the same places. msvcp140.dll and vcomp140.dll are Microsoft's C++ and OpenMP
-  runtimes, included as Microsoft's Visual C++ Redistributable license allows.
+  Python (python.org), numpy (numpy.org), Numba (numba.pydata.org), llvmlite and Pillow
+  (python-pillow.org) come with their own licenses, in the same places. msvcp140.dll and
+  vcomp140.dll are Microsoft's C++ and OpenMP runtimes, included as Microsoft's Visual C++
+  Redistributable license allows.

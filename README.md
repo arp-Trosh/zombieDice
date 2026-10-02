@@ -9,7 +9,7 @@ Runs in Windows Terminal and in Linux/macOS terminals. The 3D graphics come from
 
 ```sh
 python3 -m venv .venv && . .venv/bin/activate   # Windows: py -m venv .venv; .venv\Scripts\activate
-pip install -r requirements.txt                  # numpy, Numba and unicode3d (Python 3.10 or later)
+pip install -r requirements.txt                  # numpy, Numba, Pillow and unicode3d (Python 3.10 or later)
 python3 -m zombie [--name NAME]                  # the game (needs an 80x24 terminal; bigger looks better)
 ```
 
@@ -177,7 +177,7 @@ broadcasts `state` snapshots and `chat` lines. A player who disconnects mid-game
 
 The renderer lives in its own repository, [arp-Trosh/unicode3d](https://github.com/arp-Trosh/unicode3d),
 which documents how it draws and its API. `requirements.txt` pins the version the game uses (a git
-tag, currently `v0.4.0`); the game uses `unicode3d`'s public modules and builds its dice on
+tag, currently `v0.8.3`); the game uses `unicode3d`'s public modules and builds its dice on
 `unicode3d.examples.dice`. Engine features on show:
 
 | where | what it uses |

@@ -6,7 +6,7 @@
 # bundlers like PyInstaller trip antivirus heuristics.
 #
 # Run from the repository root with the same Python version and git on PATH (it installs numpy,
-# Numba and unicode3d for it):
+# Numba, Pillow and unicode3d for it):
 #   pwsh packaging/windows/build.ps1 -Version 1.0.0
 param(
     [string]$Version = "dev",
@@ -36,10 +36,10 @@ Remove-Item (Join-Path $app "pythonw.exe"), (Join-Path $app "python$tag._pth")
 @("python$tag.zip", ".", "app", "Lib\site-packages", "import site") |
     Set-Content -Encoding ascii (Join-Path $app "$name._pth")
 
-Write-Host "== numpy, Numba (with llvmlite)"
+Write-Host "== numpy, Numba (with llvmlite), Pillow"
 # One install, so pip picks a numpy that this Numba supports.
 $site = Join-Path $app "Lib\site-packages"
-python -m pip install --disable-pip-version-check --no-compile --only-binary=:all: --target $site "numpy>=1.26" "numba>=0.61"
+python -m pip install --disable-pip-version-check --no-compile --only-binary=:all: --target $site "numpy>=1.26" "numba>=0.61" "pillow>=10.1"
 # pip adds command-line launchers (f2py.exe, numba.exe, ...) there: unsigned exes the game never uses.
 Remove-Item -Recurse -Force (Join-Path $site "bin") -ErrorAction SilentlyContinue
 # Their test suites (about 14 MB) are never used by the game.
