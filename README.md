@@ -5,6 +5,14 @@ Runs in Windows Terminal and in Linux/macOS terminals. The 3D graphics come from
 [unicode3d](https://github.com/arp-Trosh/unicode3d), a separate terminal renderer that falls back to
 256 or 16 colours and to ASCII on terminals that need it.
 
+![The main menu: the Zombie Dice logo over a graveyard at night, zombies among the headstones by a campfire](screenshots/menu.png)
+
+![A turn in progress: two brains and a footstep on the dice tray, the glass cup of dice beside it, Dice Kept on the left, the scoreboard on the right and the chat log below](screenshots/game.png)
+
+![Game over: a golden trophy on the dice tray in falling confetti, the winner named above it](screenshots/game-over.png)
+
+*Fullscreen kitty at 1920x1080 (186x46 cells), sextant glyphs, truecolour.*
+
 ## Play
 
 ```sh
